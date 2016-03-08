@@ -64,13 +64,13 @@ hfm = XYPitchMotor('XF:17IDA-OP:FMX{Mir:HFM', name='hfm')
 
 ## BPM Motions
 mbpm1 = XYMotor('XF:17IDA-BI:FMX{BPM:1', name='mbpm1')
-mbpm2 = XYMotor('XF:17IDA-BI:FMX{BPM:2', name='mbpm2')
-mbpm3 = XYMotor('XF:17IDA-BI:FMX{BPM:3', name='mbpm3')
+mbpm2 = XYMotor('XF:17IDC-BI:FMX{BPM:2', name='mbpm2')
+mbpm3 = XYMotor('XF:17IDC-BI:FMX{BPM:3', name='mbpm3')
 
 ## Slits Motions
 slits1 = Slits('XF:17IDA-OP:FMX{Slt:1', name='slits1')
-slits2 = Slits('XF:17IDA-OP:FMX{Slt:2', name='slits2')
-slits3 = Slits('XF:17IDA-OP:FMX{Slt:3', name='slits3')
+slits2 = Slits('XF:17IDC-OP:FMX{Slt:2', name='slits2')
+slits3 = Slits('XF:17IDC-OP:FMX{Slt:3', name='slits3')
 
 ## KB Mirror
 kbm = KBMirror('XF:17IDC-OP:FMX{Mir', name='kbm')
