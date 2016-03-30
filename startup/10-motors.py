@@ -1,5 +1,4 @@
-from ophyd import Device, Component as Cpt, EpicsMotor, EpicsSignalRO
-
+from ophyd import PVPositioner, PVPositionerPC, Device, Component as Cpt, EpicsMotor, EpicsSignal, EpicsSignalRO
 
 class XYMotor(Device):
 	x = Cpt(EpicsMotor, '-Ax:X}Mtr')
@@ -19,6 +18,29 @@ class Slits(Device):
 	x_gap = Cpt(EpicsMotor, '-Ax:XGap}Mtr')
 	y_ctr = Cpt(EpicsMotor, '-Ax:YCtr}Mtr')
 	y_gap = Cpt(EpicsMotor, '-Ax:YGap}Mtr')
+
+
+class FESlitsCenter(PVPositionerPC):
+	setpoint = Cpt(EpicsSignal, 'center')
+	readback = Cpt(EpicsSignalRO, 't2.D')
+	stop_signal = Cpt(EpicsSignal, 'FE:C17A-CT{MC:2}allstop.VAL')
+
+
+class FESlitsGap(PVPositionerPC):
+	setpoint = Cpt(EpicsSignal, 'size')
+	readback = Cpt(EpicsSignalRO, 't2.C')
+	stop_signal = Cpt(EpicsSignal, 'FE:C17A-CT{MC:2}allstop.VAL')
+
+
+class FESlits(Device):
+	i = Cpt(EpicsMotor, '{Slt:3-Ax:I}Mtr')
+	t = Cpt(EpicsMotor, '{Slt:3-Ax:T}Mtr')
+	o = Cpt(EpicsMotor, '{Slt:4-Ax:O}Mtr')
+	b = Cpt(EpicsMotor, '{Slt:4-Ax:B}Mtr')
+	x_ctr = Cpt(FESlitsCenter, '{Slt:34-Ax:X}')
+	x_gap = Cpt(FESlitsGap,    '{Slt:34-Ax:X}')
+	y_ctr = Cpt(FESlitsCenter, '{Slt:34-Ax:Y}')
+	y_gap = Cpt(FESlitsGap,    '{Slt:34-Ax:Y}')
 
 
 class HorizontalDCM(Device):
@@ -42,7 +64,7 @@ class GoniometerStack(Device):
 	gx = Cpt(EpicsMotor, '-Ax:GX}Mtr')
 	gy = Cpt(EpicsMotor, '-Ax:GY}Mtr')
 	gz = Cpt(EpicsMotor, '-Ax:GZ}Mtr')
-	o = Cpt(EpicsMotor, '-Ax:O}Mtr')
+	o  = Cpt(EpicsMotor, '-Ax:O}Mtr')
 	py = Cpt(EpicsMotor, '-Ax:PY}Mtr')
 	pz = Cpt(EpicsMotor, '-Ax:PZ}Mtr')
 
@@ -84,4 +106,5 @@ gonio = GoniometerStack('XF:17IDC-ES:FMX{Gon:1', name='gonio')
 ## Beam Conditioning Unit Shutter Translation
 sht = ShutterTranslation('XF:17IDC-ES:FMX{Sht:1', name='sht')
 
-
+## FE Slits
+fe = FESlits('FE:C17A-OP', name='fe')
