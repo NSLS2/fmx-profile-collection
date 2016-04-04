@@ -28,7 +28,7 @@ cam_mono = StandardProsilica('XF:17IDA-BI:FMX{Mono:DCM-Cam:1}', name='cam_mono')
 
 cam_fs2 = StandardProsilica('XF:17IDA-BI:FMX{FS:2-Cam:1}', name='cam_fs2')
 cam_fs3 = StandardProsilica('XF:17IDA-BI:FMX{FS:3-Cam:1}', name='cam_fs3')
-cam_fs4 = StandardProsilica('XF:17IDC-BI:FMX{FS:3-Cam:1}', name='cam_fs4')
+cam_fs4 = StandardProsilica('XF:17IDC-BI:FMX{FS:4-Cam:1}', name='cam_fs4')
 cam_fs5 = StandardProsilica('XF:17IDC-BI:FMX{FS:5-Cam:1}', name='cam_fs5')
 
 cam_7 = StandardProsilica('XF:17IDC-ES:FMX{Cam:7}', name='cam_7')
