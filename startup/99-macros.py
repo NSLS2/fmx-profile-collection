@@ -19,5 +19,8 @@ def simple_ascan(camera, stats, motor, start, end, steps):
 
     uid = ascan(motor, start, end, steps)[0]
     table = get_table(db[uid])
-    return table[[motor.name, stats_name]]
+    try:
+        return table[[motor.name, stats_name]]
+    except:
+        return table[[motor.name+"_readback", stats_name]]
 
