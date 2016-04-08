@@ -11,5 +11,5 @@ class Undulator(PVPositionerPC):
     stop_signal = Cpt(EpicsSignal, '-Mtr:2}Pos.STOP')
     stop_value = 1
 
-ivu_gap = Undulator('SR:C17-ID:G1{IVU21:2')
+ivu_gap = Undulator('SR:C17-ID:G1{IVU21:2', name='ivu_gap')
 
