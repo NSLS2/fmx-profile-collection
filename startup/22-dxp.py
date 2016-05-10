@@ -1,16 +1,11 @@
-from ophyd.mca import (EpicsMCARecord, EpicsDXP)
+from ophyd.mca import (EpicsMCA, EpicsDXP)
 from ophyd import (Component as Cpt, Device, EpicsSignal, EpicsSignalRO,
                    EpicsSignalWithRBV, DeviceStatus)
 from ophyd.device import (BlueskyInterface, Staged)
 
-
-class MercurySimpleMCA(EpicsMCARecord):
-    start = Cpt(EpicsSignal, '.STRT')
-    erase_start = Cpt(EpicsSignal, '.ERST', trigger_value=1)
-    
 class Mercury(Device):
     dxp = Cpt(EpicsDXP, 'dxp1:')
-    mca = Cpt(MercurySimpleMCA, 'mca1')
+    mca = Cpt(EpicsMCA, 'mca1')
 
     channel_advance = Cpt(EpicsSignal, 'ChannelAdvance')
     client_wait = Cpt(EpicsSignal, 'ClientWait')
@@ -30,7 +25,7 @@ class MercurySoftTrigger(BlueskyInterface):
         self._status = None
         self._acquisition_signal = self.mca.erase_start
 
-        self.stage_sigs[self.mca.stop_signal] = 1
+        #self.stage_sigs[self.mca.stop_signal] = 1
         self.stage_sigs[self.dxp.preset_mode] = 'Real time'
         #self.stage_sigs[self.dxp.preset_mode] = 'Live time'
 
@@ -45,7 +40,6 @@ class MercurySoftTrigger(BlueskyInterface):
 
     def unstage(self):
         try:
-
             super().unstage()
         finally:
             if self._count_signal in self.stage_sigs:
@@ -94,4 +88,4 @@ class FMXMercury(MercurySoftTrigger, Mercury):
                          configuration_attrs=configuration_attrs, **kwargs)
 
 
-mercury = FMXMercury('XF:17IDC-ES:FMX{Det:Mercury}', name='mercury')
+mercury = FMXMercury('XF:17IDC-ES:FMX{Det:Mer}', name='mercury')
