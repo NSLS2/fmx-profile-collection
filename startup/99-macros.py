@@ -17,7 +17,7 @@ def simple_ascan(camera, stats, motor, start, end, steps):
     stats_name = "_".join((camera.name,stats)) 
     gs.PLOT_Y = stats_name
 
-    uid = ascan(motor, start, end, steps)[0]
+    uid = RE(ascan(motor, start, end, steps))[0]
     table = get_table(db[uid])
     try:
         return table[[motor.name, stats_name]]

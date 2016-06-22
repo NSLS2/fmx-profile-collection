@@ -1,6 +1,7 @@
 import asyncio
 from functools import partial
 from bluesky.plans import *
+from bluesky.spec_api import *
 from bluesky.callbacks import *
 from bluesky.callbacks.olog import logbook_cb_factory
 from bluesky.global_state import gs, abort, stop, resume
@@ -9,14 +10,22 @@ from bluesky.utils import install_qt_kicker
 # The following line allows bluesky and pyqt4 GUIs to play nicely together:
 install_qt_kicker()
 
+
+# Subscribe metadatastore to documents.
+# If this is removed, data is not saved to metadatastore.
+import metadatastore.commands
+from bluesky.global_state import gs
+
 RE = gs.RE
 abort = RE.abort
 resume = RE.resume
 stop = RE.stop
 
+RE.subscribe_lossless('all', metadatastore.commands.insert)
+
 RE.md['group'] = 'fmx'
 RE.md['beamline_id'] = 'FMX'
-RE.ignore_callback_exceptions = False
+RE.ignore_callback_exceptions = True
 
 loop = asyncio.get_event_loop()
 loop.set_debug(False)
