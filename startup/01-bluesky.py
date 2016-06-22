@@ -1,6 +1,7 @@
 import asyncio
 from functools import partial
 from bluesky.plans import *
+from bluesky.spec_api import *
 from bluesky.callbacks import *
 from bluesky.callbacks.olog import logbook_cb_factory
 from bluesky.global_state import gs, abort, stop, resume
