@@ -7,14 +7,16 @@ def my_macro():
 
 """
 Example:
-data = simple_scan(cam_fs2, "stats1_total", hdcm.p, -2, 2, 100)
+data = simple_ascan(cam_fs2, "stats1_total", hdcm.p, -2, 2, 100)
+# or
+data = simple_ascan(keithley, "", hdcm.p, -2, 2, 100)
 print data.values
 """
 def simple_ascan(camera, stats, motor, start, end, steps):
     gs.DETS = [camera]
     gs.MASTER_DET = camera
  
-    stats_name = "_".join((camera.name,stats)) 
+    stats_name = "_".join((camera.name,stats)) if stats else camera.name
     gs.PLOT_Y = stats_name
 
     uid = RE(ascan(motor, start, end, steps))[0]
