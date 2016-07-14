@@ -73,6 +73,10 @@ class GoniometerStack(Device):
 class ShutterTranslation(Device):
 	x = Cpt(EpicsMotor, '-Ax:X}Mtr')
 
+class BeamStop(Device):
+	fx = Cpt(EpicsMotor, '-Ax:FX}Mtr')
+	fy = Cpt(EpicsMotor, '-Ax:FY}Mtr')
+
 #######################################################
 ### FMX
 #######################################################
@@ -113,3 +117,6 @@ fe = FESlits('FE:C17A-OP', name='fe')
 
 ## Holey Mirror
 hm = XYZMotor('XF:17IDC-ES:FMX{Mir:1', name='hm')
+
+## Beam Stop
+bs = BeamStop('XF:17IDC-ES:FMX{BS:1', name='bs')
