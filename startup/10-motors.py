@@ -10,6 +10,9 @@ class XYZMotor(XYMotor):
 class XYPitchMotor(XYMotor):
 	pitch = Cpt(EpicsMotor, '-Ax:P}Mtr')
 
+class XZXYMotor(Device):
+	x = Cpt(EpicsMotor, '-Ax:X}Mtr')
+	z = Cpt(EpicsMotor, '-Ax:Z}Mtr')
 
 class Slits(Device):
 	b = Cpt(EpicsMotor, '-Ax:B}Mtr')
@@ -120,3 +123,6 @@ hm = XYZMotor('XF:17IDC-ES:FMX{Mir:1', name='hm')
 
 ## Beam Stop
 bs = BeamStop('XF:17IDC-ES:FMX{BS:1', name='bs')
+
+## Collimator
+colli = XZXYMotor('XF:17IDC-ES:FMX{Colli:1', name='colli')
