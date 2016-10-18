@@ -1,9 +1,9 @@
-from databroker import DataBroker as db, get_table
+# from databroker import DataBroker as db, get_table
 
-def my_macro():
-    print('Hi')
-    wh_pos()
-    print('Hello 4')
+#def my_macro():
+#    print('Hi')
+#    wh_pos()
+#    print('Hello 4')
 
 """
 Example:
