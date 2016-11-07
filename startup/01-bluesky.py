@@ -8,9 +8,22 @@ from bluesky.global_state import gs, abort, stop, resume
 
 # Only install_nb_kicker if DISPLAY is set
 import os
-if "DISPLAY" in os.environ:
+if isnotebook():
+    # Import matplotlib and put it in interactive mode.
+    import matplotlib.pyplot as plt
+    plt.ion()
+
     from bluesky.utils import install_nb_kicker
     install_nb_kicker()
+else:
+    # Import matplotlib and put it in interactive mode.
+    import matplotlib.pyplot as plt
+    plt.ion()
+
+    # Make plots update live while scans run.
+    from bluesky.utils import install_qt_kicker
+    install_qt_kicker()
+    print("Installing Qt Kicker...")
 
 # Subscribe metadatastore to documents.
 # If this is removed, data is not saved to metadatastore.
