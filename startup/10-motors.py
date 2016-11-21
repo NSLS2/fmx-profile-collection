@@ -4,15 +4,19 @@ class XYMotor(Device):
 	x = Cpt(EpicsMotor, '-Ax:X}Mtr')
 	y = Cpt(EpicsMotor, '-Ax:Y}Mtr')
 
+
 class XYZMotor(XYMotor):
 	z = Cpt(EpicsMotor, '-Ax:Z}Mtr')
+
 
 class XYPitchMotor(XYMotor):
 	pitch = Cpt(EpicsMotor, '-Ax:P}Mtr')
 
+
 class XZXYMotor(Device):
 	x = Cpt(EpicsMotor, '-Ax:X}Mtr')
 	z = Cpt(EpicsMotor, '-Ax:Z}Mtr')
+
 
 class Slits(Device):
 	b = Cpt(EpicsMotor, '-Ax:B}Mtr')
@@ -25,16 +29,18 @@ class Slits(Device):
 	y_gap = Cpt(EpicsMotor, '-Ax:YGap}Mtr')
 
 
-class FESlitsCenter(PVPositionerPC):
+class VirtualCenter(PVPositioner):
 	setpoint = Cpt(EpicsSignal, 'center')
 	readback = Cpt(EpicsSignalRO, 't2.D')
-	stop_signal = Cpt(EpicsSignal, 'FE:C17A-CT{MC:2}allstop.VAL')
+	done = Cpt(EpicsSignalRO, 'DMOV')
+	done_value = 1
 
 
-class FESlitsGap(PVPositionerPC):
+class VirtualGap(PVPositioner):
 	setpoint = Cpt(EpicsSignal, 'size')
 	readback = Cpt(EpicsSignalRO, 't2.C')
-	stop_signal = Cpt(EpicsSignal, 'FE:C17A-CT{MC:2}allstop.VAL')
+	done = Cpt(EpicsSignalRO, 'DMOV')
+	done_value = 1
 
 
 class FESlits(Device):
@@ -42,10 +48,10 @@ class FESlits(Device):
 	t = Cpt(EpicsMotor, '{Slt:3-Ax:T}Mtr')
 	o = Cpt(EpicsMotor, '{Slt:4-Ax:O}Mtr')
 	b = Cpt(EpicsMotor, '{Slt:4-Ax:B}Mtr')
-	x_ctr = Cpt(FESlitsCenter, '{Slt:34-Ax:X}')
-	x_gap = Cpt(FESlitsGap,    '{Slt:34-Ax:X}')
-	y_ctr = Cpt(FESlitsCenter, '{Slt:34-Ax:Y}')
-	y_gap = Cpt(FESlitsGap,    '{Slt:34-Ax:Y}')
+	x_ctr = Cpt(VirtualCenter, '{Slt:34-Ax:X}')
+	y_ctr = Cpt(VirtualCenter, '{Slt:34-Ax:Y}')
+	x_gap = Cpt(VirtualGap,    '{Slt:34-Ax:X}')
+	y_gap = Cpt(VirtualGap,    '{Slt:34-Ax:Y}')
 
 
 class HorizontalDCM(Device):
