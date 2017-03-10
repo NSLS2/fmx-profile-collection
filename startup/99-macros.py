@@ -26,3 +26,22 @@ def simple_ascan(camera, stats, motor, start, end, steps):
     except:
         return table[[motor.name+"_readback", stats_name]]
 
+def wire_scan(detector, motor, start, stop, steps, sleep_time=1):
+    gonio.py.move(start)
+    time.sleep(sleep_time)
+    def dwell(detectors, motor, step):
+        yield from checkpoint()
+        yield from abs_set(motor, step, wait=True)
+        yield from sleep(sleep_time)
+        return (yield from trigger_and_read(list(detectors)+[motor]))
+    
+    plan = scan([detector], motor, start, stop, steps, per_step=dwell)
+
+    s = RE(plan, [LiveTable([detector, motor]), LivePlot(detector.name, motor.name)])
+    data = get_table(db[s])
+    y = data[detector.name]
+    dy = np.diff(y)
+    x = data[motor.name]
+
+    plt.plot(x[1:], dy)
+    
