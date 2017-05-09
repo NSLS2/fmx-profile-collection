@@ -29,7 +29,8 @@ class StandardProsilica(SingleTrigger, ProsilicaDetector):
 class StandardProsilicaWithTIFF(StandardProsilica):
     tiff = Cpt(TIFFPluginWithFileStore,
                suffix='TIFF1:',
-               write_path_template='/tmp/')
+               write_path_template='/tmp/',
+               root='/tmp')
 
 cam_fs1 = StandardProsilica('XF:17IDA-BI:FMX{FS:1-Cam:1}', name='cam_fs1')
 cam_mono = StandardProsilica('XF:17IDA-BI:FMX{Mono:DCM-Cam:1}', name='cam_mono')
