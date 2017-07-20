@@ -59,6 +59,8 @@ class HorizontalDCM(Device):
 	g = Cpt(EpicsMotor, '-Ax:G}Mtr')
 	p = Cpt(EpicsMotor, '-Ax:P}Mtr')
 	r = Cpt(EpicsMotor, '-Ax:R}Mtr')
+	e = Cpt(EpicsMotor, '-Ax:E}Mtr')
+	w = Cpt(EpicsMotor, '-Ax:W}Mtr')
 
 
 class KBMirror(Device):
