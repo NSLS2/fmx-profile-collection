@@ -643,4 +643,6 @@ def test_zebra(start=0, end=2, frame_time=0.2, dead_time=0.05, num_frames=10):
     yield from fly([zebra])
     zebra.unstage()
 
-zebra = Zebra('XF:17IDC-ES:FMX{Zeb:3}:', name='zebra')
+zebra1 = Zebra('XF:17IDA-ES:FMX{Zeb:1}:', name='zebra1')
+zebra2 = Zebra('XF:17IDC-ES:FMX{Zeb:2}:', name='zebra2')
+zebra3 = Zebra('XF:17IDC-ES:FMX{Zeb:3}:', name='zebra3')
