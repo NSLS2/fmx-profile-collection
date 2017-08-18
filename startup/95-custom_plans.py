@@ -16,10 +16,10 @@ def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None):
           kbv   | slt:3 vert  |   Low Mag
 
     start: float
-        The starting position of the aperture center
+        The starting position (um) of the aperture center
 
     end: float
-        The ending position of the aperture center
+        The ending position (um) of the aperture center
 
     steps: int
         The number of steps (number of points) to take
@@ -31,7 +31,7 @@ def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None):
         be arbitrarily set to 15 um/s.
 
     gap: float (default=None)
-        The size of the gap. If None, the current gap will be used.
+        The size of the gap in um. If `None`, the current gap will be used.
 
     camera: camera object (default=None)
         The camera to be used in this scan. If `None`, the camera listed
