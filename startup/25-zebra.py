@@ -121,9 +121,9 @@ class ZebraPulse(Device):
     def __init__(self, prefix, *, index=None, parent=None,
                  configuration_attrs=None, read_attrs=None, **kwargs):
         if read_attrs is None:
-            read_attrs = []
+            read_attrs = ['input_status', 'output']
         if configuration_attrs is None:
-            configuration_attrs = _get_configuration_attrs(self.__class__)
+            configuration_attrs = _get_configuration_attrs(self.__class__, signal_class=ZebraSignalWithRBV) + ['input_edge']
 
         zebra = parent
         self.index = index
@@ -176,9 +176,9 @@ class ZebraOutputType(Device):
     def __init__(self, prefix, *, read_attrs=None, configuration_attrs=None,
                  **kwargs):
         if read_attrs is None:
-            read_attrs = []
+            read_attrs = ['status']
         if configuration_attrs is None:
-            configuration_attrs = _get_configuration_attrs(self.__class__)
+            configuration_attrs = ['addr']
 
         super().__init__(prefix, read_attrs=read_attrs,
                          configuration_attrs=configuration_attrs, **kwargs)
@@ -189,11 +189,31 @@ class ZebraFrontOutput12(ZebraOutputBase):
     lvds = Cpt(ZebraOutputType, 'LVDS')
     nim = Cpt(ZebraOutputType, 'NIM')
 
+    def __init__(self, prefix, *, read_attrs=None, configuration_attrs=None,
+                 **kwargs):
+        if read_attrs is None:
+            read_attrs = []
+        if configuration_attrs is None:
+            configuration_attrs = _get_configuration_attrs(self.__class__, signal_class=ZebraOutputType)
+
+        super().__init__(prefix, read_attrs=read_attrs,
+                         configuration_attrs=configuration_attrs, **kwargs)
+
 
 class ZebraFrontOutput3(ZebraOutputBase):
     ttl = Cpt(ZebraOutputType, 'TTL')
     lvds = Cpt(ZebraOutputType, 'LVDS')
     open_collector = Cpt(ZebraOutputType, 'OC')
+
+    def __init__(self, prefix, *, read_attrs=None, configuration_attrs=None,
+                 **kwargs):
+        if read_attrs is None:
+            read_attrs = []
+        if configuration_attrs is None:
+            configuration_attrs = _get_configuration_attrs(self.__class__, signal_class=ZebraOutputType)
+
+        super().__init__(prefix, read_attrs=read_attrs,
+                         configuration_attrs=configuration_attrs, **kwargs)
 
 
 class ZebraFrontOutput4(ZebraOutputBase):
@@ -201,12 +221,32 @@ class ZebraFrontOutput4(ZebraOutputBase):
     nim = Cpt(ZebraOutputType, 'NIM')
     pecl = Cpt(ZebraOutputType, 'PECL')
 
+    def __init__(self, prefix, *, read_attrs=None, configuration_attrs=None,
+                 **kwargs):
+        if read_attrs is None:
+            read_attrs = []
+        if configuration_attrs is None:
+            configuration_attrs = _get_configuration_attrs(self.__class__, signal_class=ZebraOutputType)
+
+        super().__init__(prefix, read_attrs=read_attrs,
+                         configuration_attrs=configuration_attrs, **kwargs)
+
 
 class ZebraRearOutput(ZebraOutputBase):
     enca = Cpt(ZebraOutputType, 'ENCA')
     encb = Cpt(ZebraOutputType, 'ENCB')
     encz = Cpt(ZebraOutputType, 'ENCZ')
     conn = Cpt(ZebraOutputType, 'CONN')
+
+    def __init__(self, prefix, *, read_attrs=None, configuration_attrs=None,
+                 **kwargs):
+        if read_attrs is None:
+            read_attrs = []
+        if configuration_attrs is None:
+            configuration_attrs = _get_configuration_attrs(self.__class__, signal_class=ZebraOutputType)
+
+        super().__init__(prefix, read_attrs=read_attrs,
+                         configuration_attrs=configuration_attrs, **kwargs)
 
 
 class ZebraEncoder(Device):
@@ -221,7 +261,7 @@ class ZebraEncoder(Device):
         if read_attrs is None:
             read_attrs = []
         if configuration_attrs is None:
-            configuration_attrs = _get_configuration_attrs(self.__class__)
+            configuration_attrs = ['encoder_res', 'encoder_off']
 
         self.index = index
         self._zebra_prefix = parent.prefix
@@ -231,7 +271,7 @@ class ZebraEncoder(Device):
                          parent=parent, **kwargs)
 
     def copy_position(self):
-        self._copy_pos_signal.put(1)
+        self._copy_pos_signal.put(1, wait=True)
 
 
 class ZebraGateInput(Device):
@@ -248,9 +288,9 @@ class ZebraGateInput(Device):
     def __init__(self, prefix, *, index=None, parent=None,
                  configuration_attrs=None, read_attrs=None, **kwargs):
         if read_attrs is None:
-            read_attrs = []
+            read_attrs = ['status']
         if configuration_attrs is None:
-            configuration_attrs = _get_configuration_attrs(self.__class__)
+            configuration_attrs = ['addr', 'edge']
 
         gate = parent
         zebra = gate.parent
@@ -277,9 +317,9 @@ class ZebraGate(Device):
                                 }
 
         if read_attrs is None:
-            read_attrs = []
+            read_attrs = ['output']
         if configuration_attrs is None:
-            configuration_attrs = ['output']
+            configuration_attrs = ['input1', 'input2']
 
         super().__init__(prefix, configuration_attrs=configuration_attrs,
                          read_attrs=read_attrs, **kwargs)
@@ -293,8 +333,21 @@ class ZebraPositionCaptureDeviceBase(Device):
     source = Cpt(ZebraSignalWithRBV, 'SEL', put_complete=True)
     input_addr = Cpt(ZebraSignalWithRBV, 'INP')
     input_str = Cpt(EpicsSignalRO, 'INP:STR', string=True)
-    input_status = Cpt(EpicsSignalRO, 'INP:STA')
+    input_status = Cpt(EpicsSignalRO, 'INP:STA', auto_monitor=True)
     output = Cpt(EpicsSignalRO, 'OUT', auto_monitor=True)
+
+    def __init__(self, prefix, *, configuration_attrs=None, read_attrs=None,
+                 **kwargs):
+
+        if read_attrs is None:
+            read_attrs = []
+        read_attrs += ['input_status', 'output']
+
+        if configuration_attrs is None:
+            configuration_attrs = []
+
+        super().__init__(prefix, configuration_attrs=configuration_attrs,
+                         read_attrs=read_attrs, **kwargs)
 
 
 class ZebraPositionCaptureArm(ZebraPositionCaptureDeviceBase):
@@ -312,10 +365,6 @@ class ZebraPositionCaptureArm(ZebraPositionCaptureDeviceBase):
 
     def __init__(self, prefix, *, parent=None,
                  configuration_attrs=None, read_attrs=None, **kwargs):
-        if read_attrs is None:
-            read_attrs = []
-        if configuration_attrs is None:
-            configuration_attrs = _get_configuration_attrs(self.__class__)
 
         self._parent_prefix = parent.prefix
 
@@ -330,6 +379,17 @@ class ZebraPositionCaptureGate(ZebraPositionCaptureDeviceBase):
     width = Cpt(EpicsSignal, 'WID')
     step = Cpt(EpicsSignal, 'STEP')
 
+    def __init__(self, prefix, *, configuration_attrs=None, read_attrs=None,
+                 **kwargs):
+
+        if read_attrs is None:
+            read_attrs = []
+        if configuration_attrs is None:
+            configuration_attrs = _get_configuration_attrs(self.__class__, signal_class=EpicsSignal)
+
+        super().__init__(prefix, configuration_attrs=configuration_attrs,
+                         read_attrs=read_attrs, **kwargs)
+
 
 class ZebraPositionCapturePulse(ZebraPositionCaptureDeviceBase):
     max_pulses = Cpt(EpicsSignal, 'MAX')
@@ -337,6 +397,17 @@ class ZebraPositionCapturePulse(ZebraPositionCaptureDeviceBase):
     width = Cpt(EpicsSignal, 'WID')
     step = Cpt(EpicsSignal, 'STEP')
     delay = Cpt(EpicsSignal, 'DLY')
+
+    def __init__(self, prefix, *, configuration_attrs=None, read_attrs=None,
+                 **kwargs):
+
+        if read_attrs is None:
+            read_attrs = []
+        if configuration_attrs is None:
+            configuration_attrs = _get_configuration_attrs(self.__class__, signal_class=EpicsSignal)
+
+        super().__init__(prefix, configuration_attrs=configuration_attrs,
+                         read_attrs=read_attrs, **kwargs)
 
 
 class ZebraPositionCaptureData(Device):
@@ -357,6 +428,15 @@ class ZebraPositionCaptureData(Device):
     div2 = Cpt(EpicsSignalRO, 'DIV2')
     div3 = Cpt(EpicsSignalRO, 'DIV3')
     div4 = Cpt(EpicsSignalRO, 'DIV4')
+
+    def __init__(self, prefix, *, configuration_attrs=None, read_attrs=None,
+                 **kwargs):
+
+        if read_attrs is None:
+            read_attrs = _get_configuration_attrs(self.__class__, signal_class=EpicsSignalRO)
+
+        super().__init__(prefix, configuration_attrs=configuration_attrs,
+                         read_attrs=read_attrs, **kwargs)
 
 
 class ZebraPositionCapture(Device):
@@ -382,6 +462,23 @@ class ZebraPositionCapture(Device):
     capture_div4 = Cpt(EpicsSignal, 'BIT_CAP:B9')
 
     data = Cpt(ZebraPositionCaptureData, '')
+
+    def __init__(self, prefix, *, configuration_attrs=None, read_attrs=None,
+                 **kwargs):
+
+        if read_attrs is None:
+            read_attrs = ['data']
+        if configuration_attrs is None:
+            configuration_attrs = (
+                ['source', 'direction', 'time_units',
+                 'arm', 'gate', 'pulse'] +
+                [f'capture_enc{i}' for i in range(1,5)] +
+                [f'capture_sys{i}' for i in range(1,3)] +
+                [f'capture_div{i}' for i in range(1,5)]
+            )
+
+        super().__init__(prefix, configuration_attrs=configuration_attrs,
+                         read_attrs=read_attrs, **kwargs)
 
 
 class ZebraBase(Device):
@@ -416,7 +513,7 @@ class ZebraBase(Device):
     encoder4 = Cpt(ZebraEncoder, '', index=4)
 
     pos_capt = Cpt(ZebraPositionCapture, 'PC_')
-    download_status = Cpt(EpicsSignalRO, 'ARRAY_ACQ', auto_monitor=True)
+    download_status = Cpt(EpicsSignalRO, 'ARRAY_ACQ')
     reset = Cpt(EpicsSignal, 'SYS_RESET.PROC')
 
     addresses = ZebraAddresses
@@ -426,7 +523,14 @@ class ZebraBase(Device):
         if read_attrs is None:
             read_attrs = []
         if configuration_attrs is None:
-            configuration_attrs = _get_configuration_attrs(self.__class__)
+            configuration_attrs = (
+                [f'soft_input{i}' for i in range(1,5)] +
+                [f'pulse{i}' for i in range(1,5)] +
+                [f'output{i}' for i in range(1,9)] +
+                [f'gate{i}' for i in range(1,5)] +
+                [f'encoder{i}' for i in range(1,5)] +
+                ['pos_capt']
+            )
 
         super().__init__(prefix, configuration_attrs=configuration_attrs,
                          read_attrs=read_attrs, **kwargs)
@@ -450,198 +554,143 @@ class ZebraBase(Device):
 
 
 class Zebra(ZebraBase):
-    MASTERS = ('x', 'y', 'z', 'o')
-
-    master = Cpt(Signal, value='o',
-                 doc="Master motor. Valid values: {}".format(MASTERS))
-    master_start = Cpt(Signal, value=0,
-                       doc="Starting position of the master positioner")
-    master_end = Cpt(Signal, value=100,
-                     doc="Ending position of the master positioner")
-    num_frames = Cpt(Signal, value=100,
-                     doc="Number of frames to be acquired")
-    exposure = Cpt(Signal, value=0.1,
-                     doc="Exposure, in ms")
-    dead_time = Cpt(Signal, value=0.01,
-                    doc="Detector dead time, in ms")
 
     def __init__(self, prefix, *args, **kwargs):
-        cfg_attrs = ['master', 'master_start', 'master_end',
-                     'num_frames', 'exposure', 'dead_time']
-
         self._collection_ts = None
-        self._armed_status = None
         self._disarmed_status = None
         self._dl_status = None
-        super().__init__(prefix, configuration_attrs=cfg_attrs, *args, **kwargs)
+        super().__init__(prefix, *args, **kwargs)
 
-    def stage(self):
-        print(self.name, "stage")
-        if self.master.get() not in self.MASTERS:
-            fmt = 'Invalid master positioner {}, must be one of {}'
-            raise ValueError(fmt.format(self.master.get(), self.MASTERS))
+    def setup(self, master, arm_source, gate_start, gate_width, gate_step, num_gates,
+              direction, pulse_width, pulse_step, capt_delay, max_pulses,
+              collect=[True, True, True, True]):
 
-        if self.dead_time.get() > self.exposure.get():
-            raise ValueError('Dead time is greater than exposure')
+        # arm_source is either 0 (soft) or 1 (external)
+        # direction is either 0 (positive) or 1 (negative)
+        # gate_* parameters in motor units
+        # pulse_*, capt_delay parameters in ms
+        # collect represents which of the four encoders to collect data from
+
+        # Sanity checks
+        if master not in range(4):
+            raise ValueError(f"Invalid master positioner '{master}', must be between 0 and 3")
+
+        if arm_source not in (0, 1):
+            raise ValueError('arm_source must be either 0 (soft) or 1 (external)')
+
+        if direction not in (0, 1):
+            raise ValueError('direction must be either 0 (positive) or 1 (negative)')
+
+        if gate_width > gate_step:
+            raise ValueError('gate_width must be smaller than gate_step')
+
+        if pulse_width > pulse_step:
+            raise ValueError('pulse_width must be smaller than pulse_step')
 
         # Reset Zebra state
         self.reset.put(1, wait=True)
         time.sleep(0.1)
 
-        pos_capt_source = self.MASTERS.index(self.master.get())
+        pc = self.pos_capt
 
-        master_start = self.master_start.get()
-        master_width = abs(self.master_start.get() - self.master_end.get())
-        master_dir = int(self.master_end.get() < self.master_start.get())  # 0: Positive, 1: Negative
-        
-        pulse_step = self.exposure.get()
-        pulse_width = self.exposure.get() - self.dead_time.get()
-        num_frames = self.num_frames.get()
+        pc.time_units.put("ms", wait=True)
+        pc.gate.source.put("Position", wait=True)
+        pc.pulse.source.put("Time", wait=True)
 
-        # Synchronize encoders
+        # Setup which encoders to capture
+        for encoder, do_capture in zip((pc.capture_enc1, pc.capture_enc2, pc.capture_enc3, pc.capture_enc4), collect):
+            encoder.put(int(do_capture), wait=True)
+
+        # Configure Position Capture
+        pc.source.put(master, wait=True)
+        pc.direction.put(direction, wait=True)
+
+        # Configure Position Capture Gate
+        pc.gate.start.put(gate_start, wait=True)
+        pc.gate.width.put(gate_width, wait=True)
+        pc.gate.step.put(gate_step, wait=True)
+        pc.gate.num_gates.put(num_gates, wait=True)
+
+        # Configure Position Capture Pulses
+        pc.pulse.start.put(0, wait=True)
+        pc.pulse.step.put(pulse_step, wait=True)
+        pc.pulse.width.put(pulse_width, wait=True)
+        pc.pulse.delay.put(capt_delay, wait=True)
+        pc.pulse.max_pulses.put(max_pulses, wait=True)
+
+        # Synchronize encoders (do it last)
         for encoder in self.encoder.values():
             encoder.copy_position()
-            
-        # Set it with settle time, buggy otherwise
-        #self.pos_capt.time_units.set("ms", settle_time=1.0)
-        #self.pos_capt.gate.source.set("Position", settle_time=1.0)
-        #self.pos_capt.pulse.source.set("Time", settle_time=1.0)
-        
-        self.pos_capt.time_units.put("ms", wait=True)
-        self.pos_capt.gate.source.put("Position", wait=True)
-        self.pos_capt.pulse.source.put("Time", wait=True)
-        self.pos_capt.source.put(pos_capt_source, wait=True)
-
-        self.stage_sigs.update({
-            # Configure Position Capture
-            self.pos_capt.direction: master_dir,
-
-            self.pos_capt.capture_enc1: 1,
-            self.pos_capt.capture_enc2: 1,
-            self.pos_capt.capture_enc3: 1,
-            self.pos_capt.capture_enc4: 1,
-
-            # Configure Position Capture Arm
-            self.pos_capt.arm.source: "Soft",
-
-            # Configure Position Capture Gate
-            self.pos_capt.gate.start: master_start,
-            self.pos_capt.gate.width: master_width,
-            self.pos_capt.gate.step: master_width,
-            self.pos_capt.gate.num_gates: 1,
-
-            # Configure Position Capture Pulses
-            self.pos_capt.pulse.step: pulse_step,
-            self.pos_capt.pulse.width: pulse_width,
-            self.pos_capt.pulse.delay: 0,
-            self.pos_capt.pulse.max_pulses: num_frames,
-        })
-        return super().stage()
 
     def kickoff(self):
-        print(self.name, "kickoff")
-        self._armed_status = DeviceStatus(self)
-        self._disarmed_status = DeviceStatus(self)
-        self.pos_capt.arm.output.subscribe(self._armed_status_changed, run=False)
-        self.download_status.subscribe(self._disarmed_status_changed, run=False)
+        armed_status = DeviceStatus(self)
+        self._disarmed_status = disarmed_status = DeviceStatus(self)
 
-        self.pos_capt.arm.arm.put(1)
+        pc = self.pos_capt
+        external = bool(pc.arm.source.get()) # Using external trigger?
+
+        if external:
+            armed_signal = pc.arm.input_status
+        else:
+            armed_signal = pc.arm.output
+
+        disarmed_signal = self.download_status
+
         self._collection_ts = time.time()
-        return self._armed_status
+
+        def armed_status_cb(value, old_value, obj, **kwargs):
+            if int(old_value) == 0 and int(value) == 1:
+                armed_status._finished()
+                obj.clear_sub(armed_status_cb)
+
+        def disarmed_status_cb(value, old_value, obj, **kwargs):
+            # I'm getting a stale 1 -> 0 update, so use timestamps to filter that out
+            if int(old_value) == 1 and int(value) == 0:
+                disarmed_status._finished()
+                obj.clear_sub(disarmed_status_cb)
+
+        armed_signal.subscribe(armed_status_cb, run=False)
+        disarmed_signal.subscribe(disarmed_status_cb, run=False)
+
+        # Arm it if not External
+        if not external:
+            self.pos_capt.arm.arm.put(1)
+
+        return armed_status
 
     def complete(self):
-        print(self.name, "complete")
         return self._disarmed_status
 
     def collect(self):
-        print(self.name, "collect")
-        ts = self.pos_capt.data.time.get()
-        x = self.pos_capt.data.enc1.get()
-        y = self.pos_capt.data.enc2.get()
-        z = self.pos_capt.data.enc3.get()
-        o = self.pos_capt.data.enc4.get()
-        
-        #ts = [1, 2, 3, 4]
-        #x = [10, 20, 40, 30]
-        #y = [20, 40, 30, 10]
-        #z = [30, 10, 20, 40]
-        #o = [40, 30, 10, 20]
-        
-        for timestamp, x_pos, y_pos, z_pos, o_pos in zip(ts, x, y, z, o):
-            timestamp += self._collection_ts
+        pc = self.pos_capt
+
+        # Array of timestamps
+        ts = pc.data.time.get() + self._collection_ts
+
+        # Arrays of captured positions
+        data = {
+            f'enc{i}': getattr(pc.data, f'enc{i}').get()
+                for i in range(1,5)
+                if getattr(pc, f'capture_enc{i}').get()
+        }
+
+        for i, timestamp in enumerate(ts):
             yield {
-                'data': {'x': x_pos, 'y': y_pos, 'z': z_pos, 'o': o_pos},
-                'timestamps': {'x': timestamp, 'y': timestamp, 'z': timestamp, 'o': timestamp},
-                'time': timestamp,
+                'data': { k: v[i] for k, v in data.items() },
+                'timestamps': { k: timestamp for k in data.keys() },
+                'time' : timestamp
             }
 
     def describe_collect(self):
         return {
-            self.name: {
-                'x': {
-                    'source': 'Gonio Stack X',
-                    'shape': 1,
-                    'dtype': 'number',
-                    'units': 'um',
-                    'precision': 3,
-                    'object_name': 'x'
-                },
-                'y': {
-                    'source': 'Gonio Pin Y',
-                    'shape': 1,
-                    'dtype': 'number',
-                    'units': 'um',
-                    'precision': 3
-                },
-                'z': {
-                    'source': 'Gonio Pin Z',
-                    'shape': 1,
-                    'dtype': 'number',
-                    'units': 'um',
-                    'precision': 3
-                },
-                'o': {
-                    'source': 'Gonio Omega',
-                    'shape': 1,
-                    'dtype': 'number',
-                    'units': 'deg',
-                    'precision': 3
-                }
+            'primary': {
+                f'enc{i}': {
+                    'source': 'PV:' + getattr(self.pos_capt.data, f'enc{i}').pvname,
+                    'shape': [],
+                    'dtype': 'number'
+                } for i in range(1, 5) if getattr(self.pos_capt, f'capture_enc{i}').get()
             }
         }
-    
-    def decribe(self):
-        return self.describe_collect()
-    
-    def _armed_status_changed(self, value=None, old_value=None, obj=None, *args, **kwargs):
-        if old_value == 0 and value == 1:
-            if self._armed_status is not None:
-                self._armed_status._finished()
-                print(self.name, "armed")
-            obj.clear_sub(self._armed_status_changed)
-
-    def _disarmed_status_changed(self, value=None, old_value=None, obj=None, *args, **kwargs):
-        if old_value == 1 and value == 0:
-            if self._disarmed_status is not None:
-                self._disarmed_status._finished()
-                print(self.name, "disarmed")
-            obj.clear_sub(self._disarmed_status_changed)
-
-
-def test_zebra(start=0, end=2, frame_time=0.2, dead_time=0.05, num_frames=10):
-    # zebra.pos_capt.gate.source.set("Position", settle_time=1.0)
-    zebra.pos_capt.gate.source.set("Time", settle_time=1.0)
-    zebra.pos_capt.pulse.source.set("Time", settle_time=1.0)
-
-    zebra.master_start.set(start)
-    zebra.master_end.set(end)
-    zebra.frame_time.set(frame_time)
-    zebra.dead_time.set(dead_time)
-    zebra.num_frames.set(num_frames)
-
-    zebra.stage()
-    yield from fly([zebra])
-    zebra.unstage()
 
 zebra1 = Zebra('XF:17IDA-ES:FMX{Zeb:1}:', name='zebra1')
 zebra2 = Zebra('XF:17IDC-ES:FMX{Zeb:2}:', name='zebra2')
