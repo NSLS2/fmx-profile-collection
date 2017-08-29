@@ -592,6 +592,8 @@ class Zebra(ZebraBase):
         time.sleep(0.1)
 
         pc = self.pos_capt
+        
+        pc.arm.source.put(arm_source, wait=True)
 
         pc.time_units.put("ms", wait=True)
         pc.gate.source.put("Position", wait=True)
