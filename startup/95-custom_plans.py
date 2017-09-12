@@ -408,4 +408,94 @@ def focus_scan(steps, step_size=2, speed=None, cam=cam_7, filename='test', folde
         print(f"{cam.array_counter.get()} images captured")
 
     yield from inner()
+    
+@bp.reset_positions_decorator([hhls.x_gap, hhls.y_gap])
+def set_energy(energy):
+    
+    # Values on 2017-07-20
+    energies = [ 5000, 6000,  6539,  7110,  7200,  7500,  7600,  8052,  8331,  
+                 8979, 9660, 10000, 10400, 10500, 10871, 11564, 11919, 12284, 
+                12660, 13400, 13474, 13500]
+    
+    # LookUp Tables
+    LUT = {
+        ivu_gap: (energies, [6.895, 7.865, 8.385, 9.025, 9.062, 9.367, 6.490, 
+                             6.758, 6.925, 7.303, 7.698, 7.905, 8.139, 6.447, 
+                             6.615, 6.908, 7.065, 7.219, 7.375, 6.440, 6.462, 
+                             6.476]),
+        
+        hdcm.g: (energies, [16.331, 15.887, 15.737, 15.616, 15.600, 15.550, 
+                            15.535, 15.474, 15.430, 15.378, 15.324, 15.302, 
+                            15.279, 15.273, 15.254, 15.224, 15.211, 15.198, 
+                            15.186, 15.166, 15.164, 15.163]),
+        
+        hfm.y: ([5000, 10400, 10400.001, 13500], [0, 0, -8, -8]),
+        hfm.x: ([5000, 13500], [1.3, 1.3]),
+        hfm.pitch: ([5000, 13500], [-2.547, -2.547])
+    }
+    
+    # Last Good Position
+    LGP = {
+        hdcm.p: 1.396,
+        kbm.vx:  4500,
+        kbm.vy:  -494,
+        kbm.vp: -2547,
+        kbm.hx:   506,
+        kbm.hy:  7000,
+        kbm.hp: -2402
+    }
+ 
+    # Open HHL Slits
+    yield from bp.mv(
+        hhls.x_gap, 3,
+        hhls.y_gap, 2
+    )
+    
+    # Lookup Table
+    def lut(motor):
+        return motor, np.interp(energy, *LUT[motor])
+    
+    # Last Good Position
+    def lgp(motor):
+        return motor, LGP[motor]
+    
+    yield from bp.mv(
+        *lut(ivu_gap),   # Set IVU Gap interpolated position
+        hdcm.e, energy,  # Set Bragg Energy pseudomotor
+        *lut(hdcm.g),    # Set DCM Gap interpolated position
+        *lgp(hdcm.p),    # Set Pitch to last known good position
+        
+        # Set HFM from interpolated positions
+        *lut(hfm.x),
+        *lut(hfm.y),
+        *lut(hfm.pitch),
+        
+        # Set KB from known good setpoints
+        *lgp(kbm.vx), *lgp(kbm.vy), *lgp(kbm.vp), 
+        *lgp(kbm.hx), *lgp(kbm.hy), *lgp(kbm.hp)
+    )
+
+    # Setup plots
+    ax1 = plt.subplot(211)
+    ax1.grid(True)
+    ax2 = plt.subplot(212)
+    ax2.grid(True)
+    plt.tight_layout()
+    
+    # Decorate find_peaks to play along with our plot and plot the peak location
+    def find_peak_inner(detector, motor, start, stop, num, ax):
+        @bp.subs_decorator(LivePlot(detector, motor, ax=ax))
+        def inner():
+            peak_x, peak_y = yield from find_peak(detector, motor, start, stop, num)
+            ax.plot([peak_x], [peak_y], 'or')
+            return peak_x, peak_y
+        return inner()
+    
+    # Scan DCM Pitch
+    peak_x, peak_y = yield from find_peak_inner(bpm1, hdcm.p, -.02, .02, 41, ax1)
+    yield from bp.mv(hdcm.p, peak_x)
+
+    # Scan IVU Gap
+    peak_x, peak_y = yield from find_peak_inner(bpm1, ivu_gap, -.1, .1, 41, ax2)
+    yield from bp.mv(ivu_gap, peak_x)
 
