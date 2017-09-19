@@ -1,4 +1,5 @@
 from bluesky import plans as bp
+import epics
 
 def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None):
     """Scans a slit aperture center over a mirror against a camera
@@ -409,6 +410,23 @@ def focus_scan(steps, step_size=2, speed=None, cam=cam_7, filename='test', folde
 
     yield from inner()
     
+    
+def find_peak(det, mot, start, stop, steps):
+    print(f"Scanning {mot.name} vs {det.name}...")
+    
+    uid = yield from bp.relative_scan([det], mot, start, stop, steps)
+    
+    sp = '_setpoint' if mot is ivu_gap else '_user_setpoint'
+    data = np.array(get_table(db[uid])[[det.name+'_sum_all', mot.name+sp]])[1:]
+    
+    peak_idx = np.argmax(data[:, 0])
+    peak_x = data[peak_idx, 1]
+    peak_y = data[peak_idx, 0]
+    
+    print(f"Found peak for {mot.name} at {peak_x} {mot.egu} [BPM reading {peak_y}]")
+    return peak_x, peak_y
+
+
 @bp.reset_positions_decorator([hhls.x_gap, hhls.y_gap])
 def set_energy(energy):
     
@@ -476,15 +494,30 @@ def set_energy(energy):
     )
 
     # Setup plots
-    ax1 = plt.subplot(211)
+    ax1 = plt.subplot(311)
     ax1.grid(True)
-    ax2 = plt.subplot(212)
+    ax2 = plt.subplot(312)
     ax2.grid(True)
+    ax3 = plt.subplot(313)
     plt.tight_layout()
     
     # Decorate find_peaks to play along with our plot and plot the peak location
     def find_peak_inner(detector, motor, start, stop, num, ax):
-        @bp.subs_decorator(LivePlot(detector, motor, ax=ax))
+        det_name = detector.name+'_sum_all'
+        mot_name = motor.name+'_setpoint' if motor is ivu_gap else motor.name+'_user_setpoint'
+        
+        # Prevent going below the lower limit or above the high limit
+        if motor is ivu_gap:
+            step_size = (stop - start) / (num - 1)
+            while motor.setpoint.value + start < motor.low_limit:
+                start += 5*step_size
+                stop += 5*step_size
+            
+            while motor.setpoint.value + stop > motor.high_limit:
+                start -= 5*step_size
+                stop -= 5*step_size                
+        
+        @bp.subs_decorator(LivePlot(det_name, mot_name, ax=ax))
         def inner():
             peak_x, peak_y = yield from find_peak(detector, motor, start, stop, num)
             ax.plot([peak_x], [peak_y], 'or')
@@ -492,10 +525,17 @@ def set_energy(energy):
         return inner()
     
     # Scan DCM Pitch
-    peak_x, peak_y = yield from find_peak_inner(bpm1, hdcm.p, -.02, .02, 41, ax1)
+    peak_x, peak_y = yield from find_peak_inner(bpm1, hdcm.p, -.03, .03, 61, ax1)
     yield from bp.mv(hdcm.p, peak_x)
 
     # Scan IVU Gap
     peak_x, peak_y = yield from find_peak_inner(bpm1, ivu_gap, -.1, .1, 41, ax2)
     yield from bp.mv(ivu_gap, peak_x)
+    
+    # Get image
+    prefix = 'XF:17IDA-BI:FMX{FS:2-Cam:1}image1:'
+    image = epics.caget(prefix+'ArrayData')
+    width = epics.caget(prefix+'ArraySize0_RBV')
+    height = epics.caget(prefix+'ArraySize1_RBV')
+    ax3.imshow(image.reshape(height, width), cmap='jet')
 
