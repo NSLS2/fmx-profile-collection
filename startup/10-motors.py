@@ -87,6 +87,12 @@ class ShutterTranslation(Device):
 class BeamStop(Device):
 	fx = Cpt(EpicsMotor, '-Ax:FX}Mtr')
 	fy = Cpt(EpicsMotor, '-Ax:FY}Mtr')
+    
+class Attenuator(Device):
+	a1 = Cpt(EpicsMotor, '-Ax:1}Mtr')
+	a2 = Cpt(EpicsMotor, '-Ax:2}Mtr')
+	a3 = Cpt(EpicsMotor, '-Ax:3}Mtr')
+	a4 = Cpt(EpicsMotor, '-Ax:4}Mtr')
 
 #######################################################
 ### FMX
@@ -135,3 +141,6 @@ bs = BeamStop('XF:17IDC-ES:FMX{BS:1', name='bs')
 
 ## Collimator
 colli = XZXYMotor('XF:17IDC-ES:FMX{Colli:1', name='colli')
+
+## BCU Attenuator
+atten = Attenuator('XF:17IDC-OP:FMX{Attn:BCU', name='atten')
