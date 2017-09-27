@@ -4,7 +4,6 @@ from ophyd import (Device, Component as Cpt, FormattedComponent as FC,
                    Signal)
 from ophyd import (EpicsSignal, EpicsSignalRO, DeviceStatus)
 from ophyd.utils import set_and_wait
-import filestore.api as fs
 from bluesky.plans import fly
 import pandas as pd
 
