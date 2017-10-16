@@ -1,5 +1,6 @@
 from bluesky import plans as bp
 import epics
+import pandas as pd
 
 def simple_ascan(camera, stats, motor, start, end, steps):
     """ Simple absolute scan of a single motor against a single camera.
@@ -20,7 +21,7 @@ def simple_ascan(camera, stats, motor, start, end, steps):
         
     yield from inner()
 
-def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None):
+def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None, filepath=None, filename=None):
     """Scans a slit aperture center over a mirror against a camera
 
     Parameters
@@ -56,6 +57,14 @@ def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None):
     camera: camera object (default=None)
         The camera to be used in this scan. If `None`, the camera listed
         in the table above will be used depending on the selected mirror.
+        
+    filepath and filename: strings (default=None)
+        Where to save the generated TIFF files and with which name prefix.
+        If any of these are set to None, TIFF files won't be saved.
+        The path refers to the filesystem on the IOC machine that runs the
+        respective camera IOC:
+            AMX: xf17id2b-ioc2
+            FMX: xf17id1c-ioc2
 
     """
     mirrors = {
@@ -95,6 +104,7 @@ def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None):
     slt_ctr     = m['slt_ctr']
     slt_gap     = m['slt_gap']
     cam         = camera.cam if camera else m['camera'].cam
+    tiff        = camera.tiff if camera else m['camera'].tiff
     stats       = camera.stats4 if camera else m['camera'].stats4
     encoder_idx = m['encoder_idx']
 
@@ -213,11 +223,31 @@ def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None):
     ax2.set_ylabel('Centroid Y', color='b')
 
     @subs_decorator([lp1, lp2, LiveTable([y1, y2])])
-    @reset_positions_decorator([cam.acquire, cam.trigger_mode, slt_ctr, slt_gap,
+    @reset_positions_decorator([cam.acquire, cam.trigger_mode, slt_gap, #slt_ctr, <- this fails with FailedStatus
                                 stats.enable, stats.compute_centroid])
+    @reset_positions_decorator([tiff.enable, tiff.auto_increment, tiff.file_path, tiff.file_name, 
+                                tiff.file_template, tiff.file_write_mode, tiff.num_capture])
     @reset_positions_decorator([slt_ctr.velocity]) # slt_ctr.velocity has to be restored before slt_ctr
     @run_decorator()
     def inner():
+        # Prepare TIFF plugin
+        if filepath is not None and filename is not None:
+            fp = filepath
+            
+            if fp[-1] != '/':
+                fp+= '/'
+                
+            print("Saving files as", "".join((fp, filename))+"_XXX.tif")
+            yield from bp.mv(
+                tiff.enable, 1,
+                tiff.auto_increment, 1,
+                tiff.file_path, fp,
+                tiff.file_name, filename,
+                tiff.file_template, "%s%s_%3.3d.tif",
+                tiff.file_write_mode, 1, # Capture mode
+                tiff.num_capture, steps,
+            )
+
         # Prepare statistics plugin
         yield from bp.mv(
             stats.enable, 1,
@@ -232,6 +262,7 @@ def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None):
             cam.array_counter, 0,
         )
         yield from bp.abs_set(cam.acquire, 1) # wait=False
+        yield from bp.abs_set(tiff.capture, 1)
 
         # Move to the starting positions
         yield from bp.mv(
@@ -250,8 +281,7 @@ def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None):
 
         while not st.done:
             yield from bp.collect(flyer, stream=True)
-            RE._uncollected.add(flyer)        # TODO: This is a hideous hack until the next bluesky version. Remove this line
-            yield from bp.sleep(0.5)
+            yield from bp.sleep(0.2)
 
         yield from bp.sleep(1)
         yield from bp.collect(flyer, stream=True)
@@ -436,7 +466,7 @@ def find_peak(det, mot, start, stop, steps):
     uid = yield from bp.relative_scan([det], mot, start, stop, steps)
     
     sp = '_setpoint' if mot is ivu_gap else '_user_setpoint'
-    data = np.array(get_table(db[uid])[[det.name+'_sum_all', mot.name+sp]])[1:]
+    data = np.array(db[uid].table()[[det.name+'_sum_all', mot.name+sp]])[1:]
     
     peak_idx = np.argmax(data[:, 0])
     peak_x = data[peak_idx, 1]
@@ -445,51 +475,74 @@ def find_peak(det, mot, start, stop, steps):
     print(f"Found peak for {mot.name} at {peak_x} {mot.egu} [BPM reading {peak_y}]")
     return peak_x, peak_y
 
+#
+# Helper functions for set_energy
+#
+
+LUT_fmt = "XF:17ID-ES:FMX{{Misc-LUT:{}}}{}-Wfm"
+LGP_fmt = "XF:17ID-ES:FMX{{Misc-LGP:{}}}Pos-SP"
+
+LUT_valid = (ivu_gap, hdcm.g, hdcm.r, hfm.y, hfm.x, hfm.pitch)
+LGP_valid = (hdcm.p, kbm.hp, kbm.hx, kbm.hy, kbm.vp, kbm.vx, kbm.vy)
+
+LUT_valid_names = [m.name for m in LUT_valid] + ['ivu_gap_off']
+LGP_valid_names = [m.name for m in LGP_valid]
+
+def read_lut(name):
+    """
+    Reads the LookUp table values for a specific motor
+    """    
+    if name not in LUT_valid_names:
+        raise ValueError('name must be one of {}'.format(LUT_valid_names))
+        
+    x, y = [epics.caget(LUT_fmt.format(name, axis)) for axis in 'XY']
+    return pd.DataFrame({'Energy':x, 'Position': y})
+
+def write_lut(name, energy, position):
+    """
+    Writes to the LookUp table for a specific motor
+    """    
+    if name not in LUT_valid_names:
+        raise ValueError('name must be one of {}'.format(LUT_valid_names))
+    
+    if len(energy) != len(position):
+        raise ValueError('energy and position must have the same number of points')
+    
+    epics.caput(LUT_fmt.format(name, 'X'), energy)
+    epics.caput(LUT_fmt.format(name, 'Y'), position)
+    
+def read_lgp(name):
+    """
+    Reads the Last Good Position value for a specific motor
+    """    
+    if name not in LGP_valid_names:
+        raise ValueError('name must be one of {}'.format(LGP_valid_names))
+        
+    return epics.caget(LGP_fmt.format(name))
+
+def write_lgp(name, position):
+    """
+    Writes to the Last Good Position value for a specific motor
+    """    
+    if name not in LGP_valid_names:
+        raise ValueError('name must be one of {}'.format(LGP_valid_names))
+        
+    return epics.caput(LGP_fmt.format(name), position)
 
 @bp.reset_positions_decorator([hhls.x_gap, hhls.y_gap])
 def set_energy(energy):
+    """
+    Sets the beamline to the desired energy
+    """
     
-    # Values on 2017-09-21
-    energies = [ 5000, 6000,  6539,  7110,  7200,  7500,  7600,  8052,  8331,  
-                 8979, 9660, 10000, 10400, 10500, 10871, 11564, 11919, 12284, 
-                12660, 13400, 13474, 13500]
-    
-    # LookUp Tables
-    LUT = {
-        ivu_gap: (energies, [6.972, 7.940, 8.466, 9.046, 9.138, 9.457, 6.533,
-                             6.805, 6.969, 7.347, 7.741, 7.938, 8.169, 6.472,
-                             6.633, 6.927, 7.075, 7.226 ,7.382 ,6.437, 6.463,
-                             6.472]),
-        
-        hdcm.g: (energies, [16.331, 15.887, 15.737, 15.616, 15.600, 15.550, 
-                            15.535, 15.474, 15.430, 15.378, 15.324, 15.302, 
-                            15.279, 15.273, 15.254, 15.224, 15.211, 15.198, 
-                            15.186, 15.166, 15.164, 15.163]),
-        
-        hfm.y: ([5000, 10400, 10400.001, 13500],
-                [   0,     0,        -8,   -8]),
+    LUT = {m: [epics.caget(LUT_fmt.format(m.name, axis)) 
+           for axis in 'XY'] 
+           for m in (ivu_gap, hdcm.g, hfm.y, hfm.x, hfm.pitch)}
 
-        hfm.x: ([5000, 13500],
-                [ 1.3,   1.3]),
+    LUT_offset = [epics.caget(LUT_fmt.format('ivu_gap_off', axis)) for axis in 'XY']
 
-        hfm.pitch: ([  5000,  13500],
-                    [-2.547, -2.547])
-    }
-    
-    # LookUp Table for the final IVU gap offset
-    LUT_offset = ([  5000,   8052,   8331,  11919,  12284,  13500],
-                  [-0.009, -0.009, -0.006, -0.006, -0.003, -0.003])
-
-    # Last Good Position
-    LGP = {
-        hdcm.p: 1.396,
-        kbm.vx:  4500,
-        kbm.vy:  -494,
-        kbm.vp: -2547,
-        kbm.hx:   506,
-        kbm.hy:  7000,
-        kbm.hp: -2402
-    }
+    LGP = {m: epics.caget(LGP_fmt.format(m.name)) 
+           for m in (hdcm.p, kbm.hp, kbm.hx, kbm.hy, kbm.vp, kbm.vx, kbm.vy)}
  
     # Open HHL Slits
     yield from bp.mv(
