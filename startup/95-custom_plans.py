@@ -233,11 +233,13 @@ def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None, filep
         # Prepare TIFF plugin
         if filepath is not None and filename is not None:
             fp = filepath
-            
+
             if fp[-1] != '/':
                 fp+= '/'
-                
-            print("Saving files as", "".join((fp, filename))+"_XXX.tif")
+
+            print("Saving files as", "".join((fp, filename, "_XXX.tif")))
+            print("First file number:", cam_8.tiff.file_number.get())
+
             yield from bp.mv(
                 tiff.enable, 1,
                 tiff.auto_increment, 1,
@@ -289,6 +291,272 @@ def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None, filep
         yield from bp.mv(stats.ts_control, "Stop")
 
     yield from inner()
+
+def find_peak(det, mot, start, stop, steps):
+    print(f"Scanning {mot.name} vs {det.name}...")
+    
+    uid = yield from bp.relative_scan([det], mot, start, stop, steps)
+    
+    sp = '_setpoint' if mot is ivu_gap else '_user_setpoint'
+    data = np.array(db[uid].table()[[det.name+'_sum_all', mot.name+sp]])[1:]
+    
+    peak_idx = np.argmax(data[:, 0])
+    peak_x = data[peak_idx, 1]
+    peak_y = data[peak_idx, 0]
+    
+    print(f"Found peak for {mot.name} at {peak_x} {mot.egu} [BPM reading {peak_y}]")
+    return peak_x, peak_y
+
+def wire_scan(detector, motor, start, stop, steps, sleep_time=1):
+    """
+    Use with Cr nanowire to determine beam size
+    
+    Motors to be scanned for FMX beam size
+    Vertical: Gonio Y (around 24830), with Gonio X = 214370 um
+    Horizontal: Gonio X (around 206270), with Gonio Y = 16420 um
+    
+    Cr ROIs for Mercury MCA: 510 570
+    
+    Examples
+    RE(wire_scan(mercury, gonio.gx, 206260, 206280, 50, sleep_time=0.5))
+    RE(wire_scan(mercury, gonio.gy, 24820, 24840, 50, sleep_time=1))
+    """    
+    last_reading = None
+    def dwell(detectors, motor, step):
+        yield from checkpoint()
+        yield from bp.abs_set(motor, step, wait=True)
+        yield from bp.sleep(sleep_time)
+        
+        return (yield from bp.trigger_and_read(list(detectors)+[motor]))
+
+    table = LiveTable([detector, motor])
+    y_name = detector.name
+    if y_name == 'mercury':
+        y_name += '_mca_rois_roi0_count'
+    plot = LivePlot(y_name, motor.name)
+
+    @subs_decorator([table, plot])
+    def inner():
+        yield from bp.abs_set(motor, start, wait=True)
+        yield from bp.sleep(sleep_time)
+        yield from scan([detector], motor, start, stop, steps, per_step=dwell)
+    
+    yield from inner()
+
+#
+# Helper functions for set_energy
+#
+
+LUT_fmt = "XF:17ID-ES:FMX{{Misc-LUT:{}}}{}-Wfm"
+LGP_fmt = "XF:17ID-ES:FMX{{Misc-LGP:{}}}Pos-SP"
+
+LUT_valid = (ivu_gap, hdcm.g, hdcm.r, hdcm.p, hfm.y, hfm.x, hfm.pitch, kbm.hy, kbm.vx)
+LGP_valid = (kbm.hp, kbm.hx, kbm.vp, kbm.vy)
+
+LUT_valid_names = [m.name for m in LUT_valid] + ['ivu_gap_off']
+LGP_valid_names = [m.name for m in LGP_valid]
+
+def read_lut(name):
+    """
+    Reads the LookUp table values for a specific motor
+    """    
+    if name not in LUT_valid_names:
+        raise ValueError('name must be one of {}'.format(LUT_valid_names))
+        
+    x, y = [epics.caget(LUT_fmt.format(name, axis)) for axis in 'XY']
+    return pd.DataFrame({'Energy':x, 'Position': y})
+
+def write_lut(name, energy, position):
+    """
+    Writes to the LookUp table for a specific motor
+    """    
+    if name not in LUT_valid_names:
+        raise ValueError('name must be one of {}'.format(LUT_valid_names))
+    
+    if len(energy) != len(position):
+        raise ValueError('energy and position must have the same number of points')
+    
+    epics.caput(LUT_fmt.format(name, 'X'), energy)
+    epics.caput(LUT_fmt.format(name, 'Y'), position)
+    
+def read_lgp(name):
+    """
+    Reads the Last Good Position value for a specific motor
+    """    
+    if name not in LGP_valid_names:
+        raise ValueError('name must be one of {}'.format(LGP_valid_names))
+        
+    return epics.caget(LGP_fmt.format(name))
+
+def write_lgp(name, position):
+    """
+    Writes to the Last Good Position value for a specific motor
+    """    
+    if name not in LGP_valid_names:
+        raise ValueError('name must be one of {}'.format(LGP_valid_names))
+        
+    return epics.caput(LGP_fmt.format(name), position)
+
+@bp.reset_positions_decorator([slits1.x_gap, slits1.y_gap])
+def set_energy(energy, hdcm_p_range=0.03, hdcm_p_points=51):
+    """
+    Sets undulator, HDCM, HFM and KB settings for a certain energy
+    
+    energy: Photon energy [eV]
+    
+    Optional arguments:
+    hdcm_p_range: HDCM rocking curve range [mrad]. Default 0.03 mrad
+    hdcm_p_points: HDCM rocking curve points. Default 51
+    
+    Lookup tables and variables are set in a settings notebook:
+    settings/set_energy setup FMX.ipynb
+    
+    Example:
+    RE(set_energy(12660))
+    RE(set_energy(7110, hdcm_p_range=0.035, hdcm_p_points=71))
+    """
+
+    # MF 20180331: List lacked hdcm.r. Added by hand. Consider using LUT_valid here (set above).
+    # Order is also different, probably irrelevant
+    LUT = {m: [epics.caget(LUT_fmt.format(m.name, axis)) 
+           for axis in 'XY'] 
+           for m in (ivu_gap, hdcm.g, hdcm.r, hdcm.p, hfm.y, hfm.x, hfm.pitch, kbm.hy, kbm.vx)}
+    
+    LUT_offset = [epics.caget(LUT_fmt.format('ivu_gap_off', axis)) for axis in 'XY']
+
+    LGP = {m: epics.caget(LGP_fmt.format(m.name)) 
+           for m in (kbm.hp, kbm.hx, kbm.vp, kbm.vy)}
+ 
+    # Open HHL Slits
+    yield from bp.mv(
+        slits1.x_gap, 3000,
+        slits1.y_gap, 2000
+    )
+    
+    # Lookup Table
+    def lut(motor):
+        return motor, np.interp(energy, *LUT[motor])
+    
+    # Last Good Position
+    def lgp(motor):
+        return motor, LGP[motor]
+    
+    yield from bp.mv(
+        *lut(ivu_gap),   # Set IVU Gap interpolated position
+        hdcm.e, energy,  # Set Bragg Energy pseudomotor
+        *lut(hdcm.g),    # Set DCM Gap interpolated position
+        *lut(hdcm.r),    # Set DCM Roll interpolated position # MF 20180331
+        *lut(hdcm.p),    # Set Pitch interpolated position
+        
+        # Set HFM from interpolated positions
+        *lut(hfm.x),
+        *lut(hfm.y),
+        *lut(hfm.pitch),
+        
+        # Set KB from interpolated positions
+        *lut(kbm.vx),
+        *lut(kbm.hy),
+        
+        # Set KB from known good setpoints
+        *lgp(kbm.vy), *lgp(kbm.vp), 
+        *lgp(kbm.hx), *lgp(kbm.hp)
+    )
+
+    # Setup plots
+    ax1 = plt.subplot(311)
+    ax1.grid(True)
+    ax2 = plt.subplot(312)
+    ax2.grid(True)
+    ax3 = plt.subplot(313)
+    plt.tight_layout()
+    
+    # Decorate find_peaks to play along with our plot and plot the peak location
+    def find_peak_inner(detector, motor, start, stop, num, ax):
+        det_name = detector.name+'_sum_all'
+        mot_name = motor.name+'_setpoint' if motor is ivu_gap else motor.name+'_user_setpoint'
+        
+        # Prevent going below the lower limit or above the high limit
+        if motor is ivu_gap:
+            step_size = (stop - start) / (num - 1)
+            while motor.setpoint.value + start < motor.low_limit:
+                start += 5*step_size
+                stop += 5*step_size
+            
+            while motor.setpoint.value + stop > motor.high_limit:
+                start -= 5*step_size
+                stop -= 5*step_size                
+        
+        @bp.subs_decorator(LivePlot(det_name, mot_name, ax=ax))
+        def inner():
+            peak_x, peak_y = yield from find_peak(detector, motor, start, stop, num)
+            ax.plot([peak_x], [peak_y], 'or')
+            return peak_x, peak_y
+        return inner()
+    
+    # Scan DCM Pitch
+    peak_x, peak_y = yield from find_peak_inner(bpm1, hdcm.p, -hdcm_p_range, hdcm_p_range, hdcm_p_points, ax1)
+    yield from bp.mv(hdcm.p, peak_x)
+
+    # Scan IVU Gap
+    peak_x, peak_y = yield from find_peak_inner(bpm1, ivu_gap, -.1, .1, 41, ax2)
+    yield from bp.mv(ivu_gap, peak_x + np.interp(energy, *LUT_offset))
+    
+    # Get image
+    prefix = 'XF:17IDA-BI:FMX{FS:2-Cam:1}image1:'
+    image = epics.caget(prefix+'ArrayData')
+    width = epics.caget(prefix+'ArraySize0_RBV')
+    height = epics.caget(prefix+'ArraySize1_RBV')
+    ax3.imshow(image.reshape(height, width), cmap='jet')
+    
+def hdcm_rock(hdcm_p_range=0.03, hdcm_p_points=51):
+    """
+    Scan HDCM crystal 2 pitch to maximize flux on BPM1
+    
+    Optional arguments:
+    hdcm_p_range: HDCM rocking curve range [mrad]. Default 0.03 mrad
+    hdcm_p_points: HDCM rocking curve points. Default 51    
+    
+    Example:
+    RE(hdcm_rock())
+    RE(hdcm_rock(hdcm_p_range=0.035, hdcm_p_points=71))
+    """
+    
+    energy = get_energy()
+
+    LUT = {m: [epics.caget(LUT_fmt.format(m.name, axis)) 
+           for axis in 'XY'] 
+           for m in (hdcm.p, )}
+    
+    # Lookup Table
+    def lut(motor):
+        return motor, np.interp(energy, *LUT[motor])
+    
+    yield from bp.mv(
+        *lut(hdcm.p)    # Set Pitch interpolated position
+    )
+
+    # Setup plots
+    ax1 = plt.subplot(111)
+    ax1.grid(True)
+    plt.tight_layout()
+    
+    # Decorate find_peaks to play along with our plot and plot the peak location
+    def find_peak_inner(detector, motor, start, stop, num, ax):
+        det_name = detector.name+'_sum_all'
+        mot_name = motor.name+'_user_setpoint'
+
+        @bp.subs_decorator(LivePlot(det_name, mot_name, ax=ax))
+        def inner():
+            peak_x, peak_y = yield from find_peak(detector, motor, start, stop, num)
+            ax.plot([peak_x], [peak_y], 'or')
+            return peak_x, peak_y
+        return inner()
+    
+    # Scan DCM Pitch
+    peak_x, peak_y = yield from find_peak_inner(bpm1, hdcm.p, -hdcm_p_range, hdcm_p_range, hdcm_p_points, ax1)
+    yield from bp.mv(hdcm.p, peak_x)
+    
+    plt.close()
 
 def focus_scan(steps, step_size=2, speed=None, cam=cam_7, filename='test', folder='/tmp/', use_roi4=False):
     """ Scans a sample along Z against a camera, taking pictures in the process.
@@ -458,165 +726,4 @@ def focus_scan(steps, step_size=2, speed=None, cam=cam_7, filename='test', folde
         print(f"{cam.array_counter.get()} images captured")
 
     yield from inner()
-    
-    
-def find_peak(det, mot, start, stop, steps):
-    print(f"Scanning {mot.name} vs {det.name}...")
-    
-    uid = yield from bp.relative_scan([det], mot, start, stop, steps)
-    
-    sp = '_setpoint' if mot is ivu_gap else '_user_setpoint'
-    data = np.array(db[uid].table()[[det.name+'_sum_all', mot.name+sp]])[1:]
-    
-    peak_idx = np.argmax(data[:, 0])
-    peak_x = data[peak_idx, 1]
-    peak_y = data[peak_idx, 0]
-    
-    print(f"Found peak for {mot.name} at {peak_x} {mot.egu} [BPM reading {peak_y}]")
-    return peak_x, peak_y
-
-#
-# Helper functions for set_energy
-#
-
-LUT_fmt = "XF:17ID-ES:FMX{{Misc-LUT:{}}}{}-Wfm"
-LGP_fmt = "XF:17ID-ES:FMX{{Misc-LGP:{}}}Pos-SP"
-
-LUT_valid = (ivu_gap, hdcm.g, hdcm.r, hfm.y, hfm.x, hfm.pitch)
-LGP_valid = (hdcm.p, kbm.hp, kbm.hx, kbm.hy, kbm.vp, kbm.vx, kbm.vy)
-
-LUT_valid_names = [m.name for m in LUT_valid] + ['ivu_gap_off']
-LGP_valid_names = [m.name for m in LGP_valid]
-
-def read_lut(name):
-    """
-    Reads the LookUp table values for a specific motor
-    """    
-    if name not in LUT_valid_names:
-        raise ValueError('name must be one of {}'.format(LUT_valid_names))
-        
-    x, y = [epics.caget(LUT_fmt.format(name, axis)) for axis in 'XY']
-    return pd.DataFrame({'Energy':x, 'Position': y})
-
-def write_lut(name, energy, position):
-    """
-    Writes to the LookUp table for a specific motor
-    """    
-    if name not in LUT_valid_names:
-        raise ValueError('name must be one of {}'.format(LUT_valid_names))
-    
-    if len(energy) != len(position):
-        raise ValueError('energy and position must have the same number of points')
-    
-    epics.caput(LUT_fmt.format(name, 'X'), energy)
-    epics.caput(LUT_fmt.format(name, 'Y'), position)
-    
-def read_lgp(name):
-    """
-    Reads the Last Good Position value for a specific motor
-    """    
-    if name not in LGP_valid_names:
-        raise ValueError('name must be one of {}'.format(LGP_valid_names))
-        
-    return epics.caget(LGP_fmt.format(name))
-
-def write_lgp(name, position):
-    """
-    Writes to the Last Good Position value for a specific motor
-    """    
-    if name not in LGP_valid_names:
-        raise ValueError('name must be one of {}'.format(LGP_valid_names))
-        
-    return epics.caput(LGP_fmt.format(name), position)
-
-@bp.reset_positions_decorator([hhls.x_gap, hhls.y_gap])
-def set_energy(energy):
-    """
-    Sets the beamline to the desired energy
-    """
-    
-    LUT = {m: [epics.caget(LUT_fmt.format(m.name, axis)) 
-           for axis in 'XY'] 
-           for m in (ivu_gap, hdcm.g, hfm.y, hfm.x, hfm.pitch)}
-
-    LUT_offset = [epics.caget(LUT_fmt.format('ivu_gap_off', axis)) for axis in 'XY']
-
-    LGP = {m: epics.caget(LGP_fmt.format(m.name)) 
-           for m in (hdcm.p, kbm.hp, kbm.hx, kbm.hy, kbm.vp, kbm.vx, kbm.vy)}
- 
-    # Open HHL Slits
-    yield from bp.mv(
-        hhls.x_gap, 3,
-        hhls.y_gap, 2
-    )
-    
-    # Lookup Table
-    def lut(motor):
-        return motor, np.interp(energy, *LUT[motor])
-    
-    # Last Good Position
-    def lgp(motor):
-        return motor, LGP[motor]
-    
-    yield from bp.mv(
-        *lut(ivu_gap),   # Set IVU Gap interpolated position
-        hdcm.e, energy,  # Set Bragg Energy pseudomotor
-        *lut(hdcm.g),    # Set DCM Gap interpolated position
-        *lgp(hdcm.p),    # Set Pitch to last known good position
-        
-        # Set HFM from interpolated positions
-        *lut(hfm.x),
-        *lut(hfm.y),
-        *lut(hfm.pitch),
-        
-        # Set KB from known good setpoints
-        *lgp(kbm.vx), *lgp(kbm.vy), *lgp(kbm.vp), 
-        *lgp(kbm.hx), *lgp(kbm.hy), *lgp(kbm.hp)
-    )
-
-    # Setup plots
-    ax1 = plt.subplot(311)
-    ax1.grid(True)
-    ax2 = plt.subplot(312)
-    ax2.grid(True)
-    ax3 = plt.subplot(313)
-    plt.tight_layout()
-    
-    # Decorate find_peaks to play along with our plot and plot the peak location
-    def find_peak_inner(detector, motor, start, stop, num, ax):
-        det_name = detector.name+'_sum_all'
-        mot_name = motor.name+'_setpoint' if motor is ivu_gap else motor.name+'_user_setpoint'
-        
-        # Prevent going below the lower limit or above the high limit
-        if motor is ivu_gap:
-            step_size = (stop - start) / (num - 1)
-            while motor.setpoint.value + start < motor.low_limit:
-                start += 5*step_size
-                stop += 5*step_size
-            
-            while motor.setpoint.value + stop > motor.high_limit:
-                start -= 5*step_size
-                stop -= 5*step_size                
-        
-        @bp.subs_decorator(LivePlot(det_name, mot_name, ax=ax))
-        def inner():
-            peak_x, peak_y = yield from find_peak(detector, motor, start, stop, num)
-            ax.plot([peak_x], [peak_y], 'or')
-            return peak_x, peak_y
-        return inner()
-    
-    # Scan DCM Pitch
-    peak_x, peak_y = yield from find_peak_inner(bpm1, hdcm.p, -.03, .03, 61, ax1)
-    yield from bp.mv(hdcm.p, peak_x)
-
-    # Scan IVU Gap
-    peak_x, peak_y = yield from find_peak_inner(bpm1, ivu_gap, -.1, .1, 41, ax2)
-    yield from bp.mv(ivu_gap, peak_x + np.interp(energy, *LUT_offset))
-    
-    # Get image
-    prefix = 'XF:17IDA-BI:FMX{FS:2-Cam:1}image1:'
-    image = epics.caget(prefix+'ArrayData')
-    width = epics.caget(prefix+'ArraySize0_RBV')
-    height = epics.caget(prefix+'ArraySize1_RBV')
-    ax3.imshow(image.reshape(height, width), cmap='jet')
-
+  

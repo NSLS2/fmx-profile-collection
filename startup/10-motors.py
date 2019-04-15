@@ -18,6 +18,12 @@ class XZXYMotor(Device):
 	z = Cpt(EpicsMotor, '-Ax:Z}Mtr')
 
 
+class XYZfMotor(Device):
+	x = Cpt(EpicsMotor, '-Ax:Xf}Mtr')
+	y = Cpt(EpicsMotor, '-Ax:Yf}Mtr')
+	z = Cpt(EpicsMotor, '-Ax:Zf}Mtr')
+
+
 class Slits(Device):
 	b = Cpt(EpicsMotor, '-Ax:B}Mtr')
 	i = Cpt(EpicsMotor, '-Ax:I}Mtr')
@@ -144,3 +150,6 @@ colli = XZXYMotor('XF:17IDC-ES:FMX{Colli:1', name='colli')
 
 ## BCU Attenuator
 atten = Attenuator('XF:17IDC-OP:FMX{Attn:BCU', name='atten')
+
+## PI Scanner Fine Stages
+pif = XYZfMotor('XF:17IDC-ES:FMX{Gon:1', name='pif')
