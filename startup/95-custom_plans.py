@@ -281,16 +281,16 @@ def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None, filep
         yield from bps.mv(slt_ctr.velocity, speed)
 
         # Go
-        yield from bp.kickoff(flyer, wait=True)
-        st = yield from bp.complete(flyer)
+        yield from bps.kickoff(flyer, wait=True)
+        st = yield from bps.complete(flyer)
         yield from bps.abs_set(slt_ctr, end + move_slack)
 
         while not st.done:
-            yield from bp.collect(flyer, stream=True)
+            yield from bps.collect(flyer, stream=True)
             yield from bps.sleep(0.2)
 
         yield from bps.sleep(1)
-        yield from bp.collect(flyer, stream=True)
+        yield from bps.collect(flyer, stream=True)
 
         yield from bps.mv(stats.ts_control, "Stop")
 
