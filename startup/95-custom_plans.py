@@ -340,7 +340,7 @@ def wire_scan(detector, motor, start, stop, steps, sleep_time=1):
         yield from bps.abs_set(motor, step, wait=True)
         yield from bps.sleep(sleep_time)
 
-        return (yield from bp.trigger_and_read(list(detectors)+[motor]))
+        return (yield from bps.trigger_and_read(list(detectors)+[motor]))
 
     table = LiveTable([detector, motor])
     y_name = detector.name
