@@ -15,7 +15,10 @@ def simple_ascan(camera, stats, motor, start, end, steps):
     try:
         motor_name = motor.readback.name
     except AttributeError:
-        motor_name = motor.name
+        try:
+            motor_name = motor.gap.name
+        except AttributeError:
+            motor_name = motor.name
 
     @bpp.subs_decorator([LivePlot(stats_name, motor_name), LiveTable([motor_name, stats_name])])
     @bpp.reset_positions_decorator([motor])
