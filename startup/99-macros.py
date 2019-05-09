@@ -11,6 +11,7 @@ def help_fmx():
     focus_scan()    - Take microscope images with changing focus
     get_energy()    - Return HDCM energy in eV
     hdcm_rock()     - Scan HDCM crystal 2 pitch to maximize flux on BPM1
+    ivu_gap_scan()  - Scan IVU21 gap against a BPM intensity signal and go to peak
     mirror_scan()   - Pencil beam scan of HFM and KB
     rd3d_calc()     - Dose estimate with RADDOSE3D
     set_beamsize()  - CRL settging to expand beam
@@ -19,6 +20,8 @@ def help_fmx():
     wire_scan()     - Scan a Cr nanowire and plot Cr XRF signal to determine beam size
     xf_bragg2e()    - Returns Energy in eV for given Bragg angle t in deg or rad
     xf_e2bragg()    - Returns Bragg angle t in deg for given Energy in eV
+    
+    Use help() to get more info, e.g. help(set_energy)
     """)
 
 

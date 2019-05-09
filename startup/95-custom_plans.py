@@ -576,7 +576,93 @@ def hdcm_rock(hdcm_p_range=0.03, hdcm_p_points=51):
     yield from bps.mv(hdcm.p, peak_x)
 
     plt.close()
+    
+    
+def ivu_gap_scan(start, end, steps, detector=bpm1, goToPeak=True):
+    """
+    Scans the IVU21 gap against a detector, and moves the gap to the peak plus a
+    energy dependent look-up table set offset
 
+    Parameters
+    ----------
+    
+    start: float
+        The starting position (um) of the VU21 undulator gap scan
+    
+    end: float
+        The end position (um) of the VU21 undulator gap scan
+    
+    detector: ophyd detector
+        The ophyd detector for the scan. Default is bpm1. Only setup up for the quad BPMs right now
+    
+    goToPeak: boolean
+        If True, go to the peak plus energy-tabulated offset. If False, go back to pre-scan value.
+    
+    Examples:
+    RE(ivu_gap_scan(7350, 7600, 70))
+    RE(ivu_gap_scan(7350, 7600, 70, goToPeak=False))
+    RE(ivu_gap_scan(7350, 7600, 70, detector=bpm4))
+    """
+        
+    energy = get_energy()
+    
+    motor=ivu_gap
+    if start-1 < motor.gap.low_limit:
+        start = motor.gap.low_limit + 1
+        print('start violates lowest limit, set to %.1f' % start + ' um')
+    
+    LUT_offset = [epics.caget(LUT_fmt.format('ivu_gap_off', axis)) for axis in 'XY']
+    
+    # Setup plots
+    ax = plt.subplot(111)
+    ax.grid(True)
+    plt.tight_layout()
+
+    # Decorate find_peaks to play along with our plot and plot the peak location
+    def find_peak_inner(detector, motor, start, stop, num, ax):
+        det_name = detector.name+'_sum_all'
+        mot_name = motor.gap.name+'_user_setpoint' if motor is ivu_gap else motor.name+'_user_setpoint'
+
+        # Prevent going below the lower limit or above the high limit
+        if motor is ivu_gap:
+            step_size = (stop - start) / (num - 1)
+            while motor.gap.user_setpoint.value + start < motor.gap.low_limit:
+                start += 5*step_size
+                stop += 5*step_size
+
+            while motor.gap.user_setpoint.value + stop > motor.gap.high_limit:
+                start -= 5*step_size
+                stop -= 5*step_size
+
+        @bpp.subs_decorator(LivePlot(det_name, mot_name, ax=ax))
+        def inner():
+            peak_x, peak_y = yield from find_peak(detector, motor, start, stop, num)
+            ax.plot([peak_x], [peak_y], 'or')
+            return peak_x, peak_y
+        return inner()
+    
+    # Remember pre-scan value
+    gapPreStart=motor.gap.user_readback.value
+    
+    # Move to start
+    yield from bps.mv(motor, start)
+    
+    # Scan IVU Gap
+    peak_x, peak_y = yield from find_peak_inner(detector, ivu_gap, 0, (end-start), steps, ax)
+    
+    # Go to peak
+    if goToPeak==True:
+        peakoffset_x = (peak_x + np.interp(energy, *LUT_offset))
+        yield from bps.mv(ivu_gap, peakoffset_x)
+        print('Gap set to peak + tabulated offset: %.1f' % peakoffset_x + ' um')
+    else:
+        yield from bps.mv(ivu_gap, gapPreStart)
+        print('Gap set to pre-scan value: %.1f' % gapPreStart + ' um')
+    
+    plt.close()
+    
+    
+    
 def focus_scan(steps, step_size=2, speed=None, cam=cam_7, filename='test', folder='/tmp/', use_roi4=False):
     """ Scans a sample along Z against a camera, taking pictures in the process.
 
