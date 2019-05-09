@@ -1,5 +1,3 @@
-# from databroker import DataBroker as db, get_table
-
 from bluesky import plans as bp
 import epics
 import numpy as np
