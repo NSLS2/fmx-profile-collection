@@ -13,9 +13,9 @@ import datetime as dt
 import os
 
 
-def _get_configuration_attrs(cls, *, signal_class=Signal):
-    return [sig_name for sig_name in cls.signal_names
-            if issubclass(getattr(cls, sig_name).cls, signal_class)]
+# def _get_configuration_attrs(cls, *, signal_class=Signal):
+#     return [sig_name for sig_name in cls.signal_names
+#             if issubclass(getattr(cls, sig_name).cls, signal_class)]
 
 
 class ZebraInputEdge(IntEnum):
@@ -122,7 +122,7 @@ class ZebraPulse(Device):
         if read_attrs is None:
             read_attrs = ['input_status', 'output']
         if configuration_attrs is None:
-            configuration_attrs = _get_configuration_attrs(self.__class__, signal_class=ZebraSignalWithRBV) + ['input_edge']
+            configuration_attrs = list(self.component_names) + ['input_edge']
 
         zebra = parent
         self.index = index
@@ -158,7 +158,7 @@ class ZebraOutputBase(Device):
         if read_attrs is None:
             read_attrs = []
         if configuration_attrs is None:
-            configuration_attrs = _get_configuration_attrs(self.__class__)
+            configuration_attrs = list(self.component_names)  # _get_configuration_attrs(self.__class__)
 
         super().__init__(prefix, read_attrs=read_attrs,
                          configuration_attrs=configuration_attrs, **kwargs)
@@ -193,7 +193,7 @@ class ZebraFrontOutput12(ZebraOutputBase):
         if read_attrs is None:
             read_attrs = []
         if configuration_attrs is None:
-            configuration_attrs = _get_configuration_attrs(self.__class__, signal_class=ZebraOutputType)
+            configuration_attrs = list(self.component_names)  # _get_configuration_attrs(self.__class__, signal_class=ZebraOutputType)
 
         super().__init__(prefix, read_attrs=read_attrs,
                          configuration_attrs=configuration_attrs, **kwargs)
@@ -209,7 +209,7 @@ class ZebraFrontOutput3(ZebraOutputBase):
         if read_attrs is None:
             read_attrs = []
         if configuration_attrs is None:
-            configuration_attrs = _get_configuration_attrs(self.__class__, signal_class=ZebraOutputType)
+            configuration_attrs = list(self.component_names)  # _get_configuration_attrs(self.__class__, signal_class=ZebraOutputType)
 
         super().__init__(prefix, read_attrs=read_attrs,
                          configuration_attrs=configuration_attrs, **kwargs)
@@ -225,7 +225,7 @@ class ZebraFrontOutput4(ZebraOutputBase):
         if read_attrs is None:
             read_attrs = []
         if configuration_attrs is None:
-            configuration_attrs = _get_configuration_attrs(self.__class__, signal_class=ZebraOutputType)
+            configuration_attrs = list(self.component_names)  # _get_configuration_attrs(self.__class__, signal_class=ZebraOutputType)
 
         super().__init__(prefix, read_attrs=read_attrs,
                          configuration_attrs=configuration_attrs, **kwargs)
@@ -242,7 +242,7 @@ class ZebraRearOutput(ZebraOutputBase):
         if read_attrs is None:
             read_attrs = []
         if configuration_attrs is None:
-            configuration_attrs = _get_configuration_attrs(self.__class__, signal_class=ZebraOutputType)
+            configuration_attrs = list(self.component_names)  # _get_configuration_attrs(self.__class__, signal_class=ZebraOutputType)
 
         super().__init__(prefix, read_attrs=read_attrs,
                          configuration_attrs=configuration_attrs, **kwargs)
@@ -384,7 +384,7 @@ class ZebraPositionCaptureGate(ZebraPositionCaptureDeviceBase):
         if read_attrs is None:
             read_attrs = []
         if configuration_attrs is None:
-            configuration_attrs = _get_configuration_attrs(self.__class__, signal_class=EpicsSignal)
+            configuration_attrs = list(self.component_names)  # _get_configuration_attrs(self.__class__, signal_class=EpicsSignal)
 
         super().__init__(prefix, configuration_attrs=configuration_attrs,
                          read_attrs=read_attrs, **kwargs)
@@ -403,7 +403,7 @@ class ZebraPositionCapturePulse(ZebraPositionCaptureDeviceBase):
         if read_attrs is None:
             read_attrs = []
         if configuration_attrs is None:
-            configuration_attrs = _get_configuration_attrs(self.__class__, signal_class=EpicsSignal)
+            configuration_attrs = list(self.component_names)  # _get_configuration_attrs(self.__class__, signal_class=EpicsSignal)
 
         super().__init__(prefix, configuration_attrs=configuration_attrs,
                          read_attrs=read_attrs, **kwargs)
@@ -432,7 +432,7 @@ class ZebraPositionCaptureData(Device):
                  **kwargs):
 
         if read_attrs is None:
-            read_attrs = _get_configuration_attrs(self.__class__, signal_class=EpicsSignalRO)
+            read_attrs = list(self.component_names)  # _get_configuration_attrs(self.__class__, signal_class=EpicsSignalRO)
 
         super().__init__(prefix, configuration_attrs=configuration_attrs,
                          read_attrs=read_attrs, **kwargs)
