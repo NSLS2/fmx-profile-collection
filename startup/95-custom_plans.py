@@ -577,7 +577,6 @@ def hdcm_rock(hdcm_p_range=0.03, hdcm_p_points=51):
 
     plt.close()
 
-
 def focus_scan(steps, step_size=2, speed=None, cam=cam_7, filename='test', folder='/tmp/', use_roi4=False):
     """ Scans a sample along Z against a camera, taking pictures in the process.
 

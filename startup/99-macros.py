@@ -2,6 +2,7 @@
 
 from bluesky import plans as bp
 import epics
+import numpy as np
 
 def help_fmx():
     """List FMX beamline functions with a short explanation"""
@@ -12,12 +13,14 @@ def help_fmx():
     focus_scan()    - Take microscope images with changing focus
     get_energy()    - Return HDCM energy in eV
     hdcm_rock()     - Scan HDCM crystal 2 pitch to maximize flux on BPM1
-    rd3d_calc()     - Dose estimate with RADDOSE3D
     mirror_scan()   - Pencil beam scan of HFM and KB
+    rd3d_calc()     - Dose estimate with RADDOSE3D
     set_beamsize()  - CRL settging to expand beam
     set_energy()    - Set undulator, HDCM, HFM and KB settings for a certain energy
     simple_ascan()  - Scan a motor against a detector
     wire_scan()     - Scan a Cr nanowire and plot Cr XRF signal to determine beam size
+    xf_bragg2e()    - Returns Energy in eV for given Bragg angle t in deg or rad
+    xf_e2bragg()    - Returns Bragg angle t in deg for given Energy in eV
     """)
 
 
@@ -208,3 +211,39 @@ def rd3d_calc(flux=3.5e12, energy=12.66,
     print("Time to Garman limit = " + "%.3f" % rd3d_out['t2gl'] + " s")
     
     return rd3d_out
+
+def xf_bragg2e(t, h=1, k=1, l=1, LN=0):
+    """
+    Returns Energy in eV for given Bragg angle t in deg or rad
+     
+    t: Bragg angle [deg or rad]
+    h,k,l: Miller indices of Si crystal (optional). Default h=k=l=1
+    LN: Set to 1 for 1st xtal cooled and 2nd xtal RT. Default 0
+    
+    Python version of IDL a2e.pro c/o Clemens Schulze Briese
+    """
+    
+    if LN: LN=1
+    tt = t*np.pi/180 if t > 1 else t
+    
+    d0 = 2*5.43102*(1-2.4e-4*LN)/np.sqrt(h^2+k^2+l^2)
+    E = 12398.42/(d0*np.sin(tt))
+    
+    return E
+
+def xf_e2bragg(E, h=1, k=1, l=1):
+    """
+    Returns Bragg angle t in deg for given Energy in eV
+    
+    E: Energy in eV. If E<100, assume it's keV and convert.
+    h,k,l: Miller indices of Si crystal optional
+    
+    Python version of IDL angle.pro c/o Clemens Schulze Briese
+    """
+    
+    if E<100: E=E*1e3
+    
+    d0 = 2*5.43102/np.sqrt(h^2+k^2+l^2)
+    t = np.arcsin(12398.42/d0/E) * 180/np.pi;
+    
+    return t
