@@ -591,6 +591,9 @@ def ivu_gap_scan(start, end, steps, detector=bpm1, goToPeak=True):
     
     end: float
         The end position (um) of the VU21 undulator gap scan
+        
+    steps: int
+        Number of steps in the scan
     
     detector: ophyd detector
         The ophyd detector for the scan. Default is bpm1. Only setup up for the quad BPMs right now
