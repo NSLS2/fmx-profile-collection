@@ -16,6 +16,7 @@ def help_fmx():
     rd3d_calc()     - Dose estimate with RADDOSE3D
     set_beamsize()  - CRL settging to expand beam
     set_energy()    - Set undulator, HDCM, HFM and KB settings for a certain energy
+    set_influence)  - Set HV power supply influence function voltage step
     simple_ascan()  - Scan a motor against a detector
     wire_scan()     - Scan a Cr nanowire and plot Cr XRF signal to determine beam size
     xf_bragg2e()    - Returns Energy in eV for given Bragg angle t in deg or rad
