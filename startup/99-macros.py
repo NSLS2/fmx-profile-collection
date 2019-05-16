@@ -110,10 +110,82 @@ def set_beamsize(sizeV, sizeH):
     
     return
 
+def set_influence(electrode, bimorph, bank):
+    """
+    Step up/down bimorph mirror electrodes for influence function measurements.
+    
+    The routine decreases the (electrode-1) electrode by the step size set for the bank,
+    then increases the chosen electrode by the step size. Step size has to be set through the 
+    PS web server interface or the IOC.
+    
+    Interface to Spellman HV power supply.
+    
+    electrode: Electrode number
+    
+    bimorph: Power supply, allowed values are ('hfm', 'kb')
+    
+    bank: Voltage bank, 1 for HFM and VKB, 2 for HKB
+    
+    Examples:
+    for i in range(16):
+        set_influence(i, 'kb', 1)
+        set_influence(i, 'kb', 1)
+        RE(mirror_scan('kbv', -1000, 1000, 400, camera=cam_8))
+        db[-1].table().to_csv('/tmp/20190319_1544_vkb_pitch_2538urad_infl20190319_{0:0{width}}.csv'.format(i, width=2))
+    
+    for i in range(16,32):
+        set_influence(i, 'kb', 2)
+        set_influence(i, 'kb', 2)
+        RE(mirror_scan('kbh', -700, 700, 400, camera=cam_8))
+        db[-1].table().to_csv('/tmp/20190319_1753_hkb_2390urad_infl20190319_{}.csv'.format(i))
+    
+    """
+    allowed_bimorphs = ('hfm', 'kb')
+    
+    if bimorph not in allowed_bimorphs:
+        print("bimorph should be one of", allowed_bimorphs)
+        return    
+    
+    if electrode < 0 or electrode > 31:
+        print("electrode must be between 0 and 31")
+        return
+    
+    if bimorph == 'hfm':
+        prefix = 'XF:17IDA-OP:FMX{Mir:HFM-PS}:'
+    elif bimorph == 'kb':
+        prefix = 'XF:17IDC-OP:FMX{Mir:KB-PS}:'
+        
+    bank_pv = epics.PV(prefix+'BANK_NO_32')
+    incr_pv = epics.PV(prefix+'INCR_U_CMD.A')
+    decr_pv = epics.PV(prefix+'DECR_U_CMD.A')        
+    step_pv = epics.PV(prefix + 'U_STEP_MON.A')
+    demand_pvs = [epics.PV(prefix + 'U{}_CURRENT_MON'.format(i)) for i in range((bank-1)*16, bank*16)]
+    
+    bank_pv.put(bank-1, wait=True)
+    time.sleep(0.5)
+    step = step_pv.get()
+    demands = [pv.get() for pv in demand_pvs]
+    new_demands = demands[:]
+    
+    i = electrode if electrode < 16 else electrode-16
+    if i > 0:
+        new_demands[i - 1] -= step
+    new_demands[i] += step
+    
+    for diff in np.diff(np.array(new_demands)):
+        if abs(diff) > 500:
+            print("got difference between values larger than 500")
+            return
+    
+    if i > 0:
+        print("decrementing electrode", electrode - 1, "by", step)
+        decr_pv.put(electrode - 1)
+    print("incrementing electrode", electrode, "by", step)
+    incr_pv.put(electrode)
+
 # RD3D_calc Raddose3D interface
 
 import subprocess
-import numpy as np
 from numpy.lib import recfunctions as rfn  # needs to be imported separately
 from shutil import copyfile
 import fileinput
@@ -212,6 +284,8 @@ def rd3d_calc(flux=3.5e12, energy=12.66,
     print("Time to Garman limit = " + "%.3f" % rd3d_out['t2gl'] + " s")
     
     return rd3d_out
+
+# X-ray utility functions
 
 def xf_bragg2e(t, h=1, k=1, l=1, LN=0):
     """
