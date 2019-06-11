@@ -9,15 +9,18 @@ def help_fmx():
     print("""
     FMX beamline functions:
     
+    fmx_flux_reference()    - Get flux reference for a list of Slit 1 gap settings
     focus_scan()    - Take microscope images with changing focus
     get_energy()    - Return HDCM energy in eV
+    get_fluxKeithley()  - Returns Keithley diode current derived flux
     hdcm_rock()     - Scan HDCM crystal 2 pitch to maximize flux on BPM1
     ivu_gap_scan()  - Scan IVU21 gap against a BPM intensity signal and go to peak
     mirror_scan()   - Pencil beam scan of HFM and KB
     rd3d_calc()     - Dose estimate with RADDOSE3D
     set_beamsize()  - CRL settging to expand beam
     set_energy()    - Set undulator, HDCM, HFM and KB settings for a certain energy
-    set_influence)  - Set HV power supply influence function voltage step
+    set_fluxBeam()  - Sets the flux reference field
+    set_influence() - Set HV power supply influence function voltage step
     simple_ascan()  - Scan a motor against a detector
     wire_scan()     - Scan a Cr nanowire and plot Cr XRF signal to determine beam size
     xf_bragg2e()    - Returns Energy in eV for given Bragg angle t in deg or rad
@@ -64,6 +67,7 @@ def slit1_flux_reference(flux_df,slit1Gap):
     Sets Slit 1 X gap and Slit 1 Y gap to a specified position,
     and returns flux reference values to a provided pandas DataFrame.
     
+    Supporting function for fmx_flux_reference()
     
     Parameters
     ----------
