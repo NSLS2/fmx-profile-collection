@@ -1,6 +1,7 @@
-from bluesky import plans as bp
 import epics
 import numpy as np
+import bluesky.plans as bp
+import pandas as pd
 
 def help_fmx():
     """List FMX beamline functions with a short explanation"""
@@ -36,6 +37,107 @@ def get_energy():
     return energy
 
 
+def get_fluxKeithley():
+    """
+    Returns Keithley diode current derived flux.
+    """
+    
+    keithFlux = epics.caget('XF:17IDA-OP:FMX{Mono:DCM-dflux}')
+    
+    return keithFlux
+
+
+def set_fluxBeam(flux):
+    """
+    Sets the flux reference field.
+    
+    flux: Beamline flux at sample position for transmisison T = 1.  [ph/s]
+    """
+    
+    error = epics.caput('XF:17IDA-OP:FMX{Mono:DCM-dflux-M}', flux)
+    
+    return error
+
+
+def slit1_flux_reference(flux_df,slit1Gap):
+    """
+    Sets Slit 1 X gap and Slit 1 Y gap to a specified position,
+    and returns flux reference values to a provided pandas DataFrame.
+    
+    
+    Parameters
+    ----------
+    
+    slit1Gap: float
+        Gap value for Slit 1 X and Y [um]
+    
+    flux_df: pandas DataFrame with fields:
+        Slit 1 X gap [um]
+        Slit 1 Y gap [um]
+        Keithley current [A]
+        Keithley flux [ph/s]
+        BPM1 sum [A]
+        BPM4 sum [A]
+        
+    """
+    
+    slits1.x_gap.move(slit1Gap)
+    slits1.y_gap.move(slit1Gap)
+    
+    flux_df.at[slit1Gap, 'Slit 1 X gap [um]'] = slit1Gap
+    flux_df.at[slit1Gap, 'Slit 1 Y gap [um]'] = slit1Gap
+    flux_df.at[slit1Gap, 'Keithley current [A]'] = keithley.value
+    flux_df.at[slit1Gap, 'Keithley flux [ph/s]'] = get_fluxKeithley()
+    flux_df.at[slit1Gap, 'BPM1 sum [A]'] = bpm1.sum_all.value
+    flux_df.at[slit1Gap, 'BPM4 sum [A]'] = bpm4.sum_all.value
+
+
+def fmx_flux_reference(slit1GapList = [2000, 1000, 600, 400]):
+    """
+    Sets Slit 1 X gap and Slit 1 Y gap to a list of settings,
+    and returns flux reference values in a pandas DataFrame.
+    
+    Parameters
+    ----------
+    
+    slit1GapList: float (default=[2000, 1000, 600, 400])
+        A list of gap values [um] for Slit 1 X and Y
+    
+    
+    Returns
+    -------
+    
+    flux_df: pandas DataFrame with fields
+        Slit 1 X gap [um]
+        Slit 1 Y gap [um]
+        Keithley current [A]
+        Keithley flux [ph/s]
+        BPM1 sum [A]
+        BPM4 sum [A]
+        
+    Examples
+    --------
+    fmx_flux_reference()
+    flux_df=fmx_flux_reference()
+    flux_df
+    fmx_flux_reference(slit1GapList = [2000, 1500, 1000])
+        
+    """
+    
+    flux_df = pd.DataFrame(columns=['Slit 1 X gap [um]',
+                                    'Slit 1 Y gap [um]',
+                                    'Keithley current [A]',
+                                    'Keithley flux [ph/s]',
+                                    'BPM1 sum [A]',
+                                    'BPM4 sum [A]',
+                                   ])
+    
+    for slit1Gap in slit1GapList:
+        slit1_flux_reference(flux_df,slit1Gap)
+        
+    return flux_df
+
+
 def set_crl(crlSlider,inOut):
     '''
     Set EPICS PVs to move CRLs in or out
@@ -52,7 +154,8 @@ def set_crl(crlSlider,inOut):
         error = epics.caput(crlSlider+'Out-Cmd',1)
     
     return error
-            
+
+
 def set_beamsize(sizeV, sizeH):
     """
     Sets Compound Refractive Lenses (CRL) to defocus the beam
@@ -110,6 +213,7 @@ def set_beamsize(sizeV, sizeH):
         print("Error: Horizontal size argument has to be \'H0\' or  \'H1\'")
     
     return
+
 
 def set_influence(electrode, bimorph, bank):
     """
