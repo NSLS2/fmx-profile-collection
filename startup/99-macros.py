@@ -9,6 +9,7 @@ def help_fmx():
     print("""
     FMX beamline functions:
     
+    fmx_dose()      - Caluclate dose for a set of LSDC settings
     fmx_flux_reference()    - Get flux reference for a list of Slit 1 gap settings
     fmx_expTime_to_10MGy()  - Caluclate experiment time that delivers a dose of 10 MGy
     focus_scan()    - Take microscope images with changing focus
@@ -18,7 +19,7 @@ def help_fmx():
     ivu_gap_scan()  - Scan IVU21 gap against a BPM intensity signal and go to peak
     mirror_scan()   - Pencil beam scan of HFM and KB
     rd3d_calc()     - Dose estimate with RADDOSE3D
-    set_beamsize()  - CRL settging to expand beam
+    set_beamsize()  - CRL setting to expand beam
     set_energy()    - Set undulator, HDCM, HFM and KB settings for a certain energy
     set_fluxBeam()  - Sets the flux reference field
     set_influence() - Set HV power supply influence function voltage step
@@ -26,7 +27,9 @@ def help_fmx():
     wire_scan()     - Scan a Cr nanowire and plot Cr XRF signal to determine beam size
     xf_bragg2e()    - Returns Energy in eV for given Bragg angle t in deg or rad
     xf_e2bragg()    - Returns Bragg angle t in deg for given Energy in eV
-    
+    xf_detZ2recResolution() - Given detector to sample distance, returns resolution at edge
+    xf_recResolution2detZ() - Given resolution at edge, returns detector to sample distance
+
     Use help() to get more info, e.g. help(set_energy)
     """)
 
@@ -139,7 +142,12 @@ def fmx_flux_reference(slit1GapList = [2000, 1000, 600, 400]):
     
     for slit1Gap in slit1GapList:
         slit1_flux_reference(flux_df,slit1Gap)
-        
+    
+    # Move back to default slit width
+    # TODO: save reference before and return to it later?
+    slits1.x_gap.move(1000)
+    slits1.y_gap.move(1000)
+    
     return flux_df
 
 
@@ -429,15 +437,154 @@ def rd3d_calc(flux=3.5e12, energy=12.66,
     return rd3d_out
 
 
+def fmx_dose(flux = -1, energy = 12.66,
+             beamsizeV = 1.0, beamsizeH = 2.0,
+             oscRange = 180, oscWidth = 0.1, exposureTimeFrame=0.02,
+             vectorL = 50,
+             verbose = False
+            ):
+    
+    """
+    Calculate the average diffraction weighted dose for a vector or standard (vectorL = 0) data
+    collection, given the parameters a users enters in LSDC: Energy, flux, beamsize, total
+    oscillation range, oscillation width, exposure time per frame and the vector length.
+    
+    Assumptions made: Crystal is similar to lysozyme, and not much larger than the beam.
+    
+    Parameters
+    ----------
+    
+    flux: float
+    Flux at sample position [ph/s]. By default this value is copied from the beamline's
+    flux-at-sample PV. Can also be set explicitly.
+    
+    energy: float
+    Photon energy [keV]. Default 12.66 keV
+    
+    beamsizeV, beamsizeH: float
+    Beam size (V, H) [um]. Default 1x2 (VxH). For now, set explicitly.
+    
+    vectorL: float
+    Vector length [um]: Make assumption that the vector is completely oriented along X-axis.
+    Default 0 um.
+    
+    oscRange: float
+    Crystal rotation for complete experiment [deg]. Start at 0, end at oscRange
+    
+    oscWidth: float
+    Crystal rotation for one frame [deg].
+    
+    exposureTimeFrame: float
+    Exposure time per frame [s]
+
+    verbose: boolean
+    True: Print out RADDOSE3D output. Default False
+    
+    
+    Internal parameters
+    -------------------
+    
+    Crystal size XYZ: Match to beam size perpendicular to (XZ), and to vector length along the
+    rotation axis (Y)
+    
+    
+    Returns
+    -------
+    
+    dose: float
+    Average Diffraction Weighted Dose [MGy]
+    
+    Examples
+    --------
+    
+    fmx_dose()
+    fmx_dose(beamsizeV = 1.6, beamsizeH = 2,
+             oscRange = 180, oscWidth = 0.2, exposureTimeFrame=0.1,
+             vectorL = 100)
+    fmx_dose(energy = 12.66, beamsizeV = 10, beamsizeH = 10, vectorL = 100, verbose = True)
+    
+    Todo
+    ----
+    
+    * Beamsize: Read from a beamsize PV, or get from a get_beamsize() function
+      - Check CRL settings
+      - Check BCU attenuator
+      - If V1H1 then 10x10 (dep on E)
+        - If V0H0 then 
+          - If BCU-Attn-T < 1.0 then 3x5
+          - If BCU-Attn-T = 1.0 then 1x2
+    * Vector length: Use the real projections
+    """
+    
+    # Beam size, assuming rd3d_calc() uses Gaussian default
+    fwhmX = beamsizeV
+    fwhmY = beamsizeH
+    collimationX = 3*beamsizeV
+    collimationY = 3*beamsizeH
+    
+    # Adjust pixelsPerMicron for RD3D to beamsize
+    if fwhmX < 1.5 or fwhmY < 1.5:
+        pixelsPerMicron = 2
+    elif fwhmX < 3.0 or fwhmY < 3.0:
+        pixelsPerMicron = 1
+    else: 
+        pixelsPerMicron = 0.5
+    
+    # Set explicitly or use current flux
+    if flux == -1:
+        # Current flux [ph/s]: From flux-at-sample PV
+        fluxSample = epics.caget('XF:17IDA-OP:FMX{Mono:DCM-dflux-MA}')
+        print('Flux at sample = {:.4g} ph/s'.format(fluxSample))
+    else:
+        fluxSample = flux            
+    
+    # RADDSE3D uses translation per deg; LSDC gives vector length
+    translatePerDegY = vectorL / oscRange
+    
+    # Crystal offset along rotation axis
+    startOffsetY = -vectorL / 2
+    exposureTimeTotal = exposureTimeFrame * oscRange / oscWidth
+    
+    # Crystal size [um]: Match to beam size in V, longer than vector in H
+    dimX = beamsizeV  # Crystal dimension V [um]
+    dimY = vectorL + beamsizeH  # Crystal dimension H [um]
+    dimZ = dimX  # Crystal dimension along beam [um]
+    
+    rd3d_out = rd3d_calc(flux=fluxSample, energy=energy,
+                         fwhmX=fwhmX, fwhmY=fwhmY,
+                         collimationX=collimationX, collimationY=collimationY,
+                         wedge=oscRange,
+                         exposureTime=exposureTimeTotal,
+                         translatePerDegX=0, translatePerDegY=translatePerDegY,
+                         startOffsetY=startOffsetY,
+                         dimX=dimX, dimY=dimY, dimZ=dimZ,
+                         #pixelsPerMicron=0.5, angularResolution=2,
+                         pixelsPerMicron=pixelsPerMicron, angularResolution=2,
+                         verbose = verbose
+                        )
+    
+    print("\n=== fmx_dose summary ===")
+    print('Total exposure time = {:1.3f} s'.format(exposureTimeTotal))
+    dose = rd3d_out['DWD'].item()  # .item() to convert 1d array to scalar
+    print('Average Diffraction Weighted Dose = {:f} MGy'.format(dose))
+    
+    return dose
+
+
 def fmx_expTime_to_10MGy(beamsizeV = 1.0, beamsizeH = 2.0,
                          vectorL = 0,
                          energy = 12.66,
                          flux = -1,
-                         wedge = 180,
+                         oscRange = 180,
                          verbose = False
                         ):
     """
-    RD3D output = AWD [MGy]
+    Calculate the total exposure time to reach an average diffraction weighted dose of 10 MGy,
+    given the beamsize, vector length, energy, flux, and total oscillation range.
+    
+    Use this function to compare this time with the total exposure time for the current settings
+    as reported by LSDC. If these times are matched, users put 10 MGy on their sample, assuming the
+    assumptions made - crystal is similar to lysozyme, and not much larger than the beam - are sensible.
     
     
     Parameters
@@ -453,8 +600,8 @@ def fmx_expTime_to_10MGy(beamsizeV = 1.0, beamsizeH = 2.0,
     energy: float
     Photon energy [keV]. Default 12.66 keV
     
-    wedge: float
-    Crystal rotation for complete experiment [deg]. Start at 0, end at wedge
+    oscRange: float
+    Crystal rotation for complete experiment [deg]. Start at 0, end at oscRange
     
     flux: float
     Flux at sample position [ph/s]. By default this value is copied from the beamline's
@@ -476,6 +623,13 @@ def fmx_expTime_to_10MGy(beamsizeV = 1.0, beamsizeH = 2.0,
     
     Experiment time [s] to Average Diffraction Weighted Dose = 10 MGy
     
+    Example
+    -------
+    
+    fmx_expTime_to_10MGy(beamsizeV = 3.0, beamsizeH = 5.0, vectorL = 100, energy = 12.7,
+                         oscRange = 180, flux = 1e12, verbose = True)
+    fmx_expTime_to_10MGy(beamsizeV = 1.0, beamsizeH = 2.0, vectorL = 50, oscRange = 180, flux = 1e12)
+    
     
     Todo
     ----
@@ -495,6 +649,14 @@ def fmx_expTime_to_10MGy(beamsizeV = 1.0, beamsizeH = 2.0,
     fwhmY = beamsizeH
     collimationX = 3*beamsizeV
     collimationY = 3*beamsizeH
+    
+    # Adjust pixelsPerMicron for RD3D to beamsize
+    if fwhmX < 1.5 or fwhmY < 1.5:
+        pixelsPerMicron = 5
+    elif fwhmX < 3.0 or fwhmY < 3.0:
+        pixelsPerMicron = 2.5
+    else: 
+        pixelsPerMicron = 0.5
     
     # Set explicitly or use current flux
     if flux == -1:
@@ -517,20 +679,20 @@ def fmx_expTime_to_10MGy(beamsizeV = 1.0, beamsizeH = 2.0,
     exposureTime = 1.0
     
     # Avoid division by zero when calculating translatePerDegY
-    if wedge == 0: wedge = 1e-3
+    if oscRange == 0: oscRange = 1e-3
     
     # Vector length [um]: Assume LSDC vector length is along X-axis (Raddose3D Y).
     # Translation per degree has to match total vector length
-    translatePerDegY = vectorL / wedge
+    translatePerDegY = vectorL / oscRange
     
     rd3d_out = rd3d_calc(flux=fluxSample, energy=energy,
                          fwhmX=fwhmX, fwhmY=fwhmY,
                          collimationX=collimationX, collimationY=collimationY,
-                         wedge=wedge,
+                         wedge=oscRange,
                          exposureTime=exposureTime,
                          translatePerDegY=translatePerDegY,
                          startOffsetY=startOffsetY,
-                         pixelsPerMicron=5, angularResolution=1,
+                         pixelsPerMicron=pixelsPerMicron, angularResolution=1,
                          dimX=dimX, dimY=dimY, dimZ=dimZ,
                          verbose=verbose
                         )
@@ -581,3 +743,35 @@ def xf_e2bragg(E, h=1, k=1, l=1):
     t = np.arcsin(12398.42/d0/E) * 180/np.pi;
     
     return t
+
+def xf_detZ2recResolution(detZ, xLambda, D=327.8):
+    """
+    Given detector to sample distance detZ, returns resolution at edge recResolution
+    http://www.xray.bioc.cam.ac.uk/xray_resources/distance-calc/calc.php
+    
+    detZ: crystal to detector distance [mm]
+    D: diameter of detector [mm].
+       Default 327.8 mm for Eiger 16M height if not specified
+    xLambda: X-ray wavelength [Ang]
+    recResolution: recordable resolution [Ang]
+    """
+    
+    recResolution = xLambda/(2*np.sin(0.5*np.arctan(0.5*D/detZ)))
+    
+    return recResolution
+
+def xf_recResolution2detZ(recResolution, xLambda, D=327.8):
+    """
+    Given resolution at edge recResolution, returns detector to sample distance detZ
+    http://www.xray.bioc.cam.ac.uk/xray_resources/distance-calc/calc.php
+    
+    detZ: crystal to detector distance [mm]
+    D: diameter of detector [mm].
+       Default 327.8 mm for Eiger 16M height if not specified
+    xLambda: X-ray wavelength [Ang]
+    recResolution: recordable resolution [Ang]
+    """
+    
+    detZ = 0.5*D/np.tan(2*np.arcsin(xLambda/(2*recResolution)))
+    
+    return detZ  

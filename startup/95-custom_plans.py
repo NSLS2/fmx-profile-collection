@@ -448,7 +448,11 @@ def set_energy(energy, hdcm_p_range=0.03, hdcm_p_points=51):
         slits1.x_gap, 3000,
         slits1.y_gap, 2000
     )
-
+    
+    # Remove CRLs if going to energy < 9 keV
+    if energy < 9001:
+        set_beamsize('V0','H0')
+    
     # Lookup Table
     def lut(motor):
         if motor is ivu_gap:
