@@ -231,9 +231,9 @@ def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None, filep
 
     @bpp.subs_decorator([lp1, lp2, LiveTable([y1, y2])])
     @bpp.reset_positions_decorator([cam.acquire, cam.trigger_mode, slt_gap, #slt_ctr, <- this fails with FailedStatus
-                                stats.enable, stats.compute_centroid])
+                                    stats.enable, stats.compute_centroid])
     @bpp.reset_positions_decorator([tiff.enable, tiff.auto_increment, tiff.file_path, tiff.file_name,
-                                tiff.file_template, tiff.file_write_mode, tiff.num_capture])
+                                    tiff.file_template, tiff.file_write_mode, tiff.num_capture])
     @bpp.reset_positions_decorator([slt_ctr.velocity]) # slt_ctr.velocity has to be restored before slt_ctr
     @bpp.run_decorator()
     def inner():
@@ -284,8 +284,8 @@ def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None, filep
         yield from bps.mv(slt_ctr.velocity, speed)
 
         # Go
-        yield from bps.kickoff(flyer, wait=True)
-        st = yield from bps.complete(flyer)
+        yield from bps.kickoff(flyer, wait=True, group='kickoff')
+        st = (yield from bps.complete(flyer))
         yield from bps.abs_set(slt_ctr, end + move_slack)
 
         while not st.done:
