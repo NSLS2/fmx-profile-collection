@@ -449,7 +449,7 @@ def set_energy(energy, hdcm_p_range=0.03, hdcm_p_points=51):
     LGP = {m: epics.caget(LGP_fmt.format(m.name))
            for m in (kbm.hp, kbm.hx, kbm.vp, kbm.vy)}
 
-    # Open HHL Slits
+    # Open Slits 1
     yield from bps.mv(
         slits1.x_gap, 3000,
         slits1.y_gap, 2000

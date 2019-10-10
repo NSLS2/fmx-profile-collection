@@ -2,6 +2,7 @@ import epics
 import numpy as np
 import bluesky.plans as bp
 import pandas as pd
+import datetime
 
 def help_fmx():
     """List FMX beamline functions with a short explanation"""
@@ -131,6 +132,9 @@ def fmx_flux_reference(slit1GapList = [2000, 1000, 600, 400]):
     fmx_flux_reference(slit1GapList = [2000, 1500, 1000])
         
     """
+    
+    print(datetime.datetime.now())
+    print("Energy = " + "%.1f" % get_energy() + " eV")
     
     flux_df = pd.DataFrame(columns=['Slit 1 X gap [um]',
                                     'Slit 1 Y gap [um]',
