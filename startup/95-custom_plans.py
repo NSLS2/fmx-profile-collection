@@ -264,14 +264,17 @@ def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None, filep
         )
 
         # Prepare Camera
-        yield from bps.mv(cam.acquire, 0)      # Stop camera...
+        yield from bps.mv(cam.acquire, 0)   # Stop camera...
+
         yield from bps.sleep(.5)               # ...and wait for the pipeline to empty.
         yield from bps.mv(
             cam.trigger_mode, "Sync In 1",    # External Trigger
             cam.array_counter, 0,
         )
         yield from bps.abs_set(cam.acquire, 1) # wait=False
-        yield from bps.abs_set(tiff.capture, 1)
+        # DAMA (mrakitin) comment 2019-08-20: the tiff plugin is not used (images are not saved)
+        # (see https://github.com/NSLS-II-FMX/profile_collection/issues/3 for details), so commenting it out
+        # yield from bps.abs_set(tiff.capture, 1)
 
         # Move to the starting positions
         yield from bps.mv(
@@ -296,6 +299,9 @@ def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None, filep
         yield from bps.collect(flyer, stream=True)
 
         yield from bps.mv(stats.ts_control, "Stop")
+
+        # Stop the camera after the scan
+        yield from bps.mv(cam.acquire, 0)   # Stop camera...
 
     yield from inner()
 
@@ -443,7 +449,7 @@ def set_energy(energy, hdcm_p_range=0.03, hdcm_p_points=51):
     LGP = {m: epics.caget(LGP_fmt.format(m.name))
            for m in (kbm.hp, kbm.hx, kbm.vp, kbm.vy)}
 
-    # Open HHL Slits
+    # Open Slits 1
     yield from bps.mv(
         slits1.x_gap, 3000,
         slits1.y_gap, 2000
