@@ -101,7 +101,7 @@ def slit1_flux_reference(flux_df,slit1Gap):
     flux_df.at[slit1Gap, 'BPM4 sum [A]'] = bpm4.sum_all.value
 
 
-def fmx_flux_reference(slit1GapList = [2000, 1000, 600, 400]):
+def fmx_flux_reference(slit1GapList = [2000, 1000, 600, 400], slit1GapDefault = 1000):
     """
     Sets Slit 1 X gap and Slit 1 Y gap to a list of settings,
     and returns flux reference values in a pandas DataFrame.
@@ -111,7 +111,8 @@ def fmx_flux_reference(slit1GapList = [2000, 1000, 600, 400]):
     
     slit1GapList: float (default=[2000, 1000, 600, 400])
         A list of gap values [um] for Slit 1 X and Y
-    
+    slit1GapDefault: Gap value [um] to set as default after getting references
+        Default slit1GapDefault = 1000
     
     Returns
     -------
@@ -130,6 +131,7 @@ def fmx_flux_reference(slit1GapList = [2000, 1000, 600, 400]):
     flux_df=fmx_flux_reference()
     flux_df
     fmx_flux_reference(slit1GapList = [2000, 1500, 1000])
+    fmx_flux_reference(slit1GapList = [2000, 1500, 1000], slit1GapDefault = 600)
         
     """
     
@@ -149,8 +151,14 @@ def fmx_flux_reference(slit1GapList = [2000, 1000, 600, 400]):
     
     # Move back to default slit width
     # TODO: save reference before and return to it later?
-    slits1.x_gap.move(1000)
-    slits1.y_gap.move(1000)
+    slits1.x_gap.move(slit1GapDefault)
+    slits1.y_gap.move(slit1GapDefault)
+    
+    vFlux = get_fluxKeithley()
+    set_fluxBeam(vFlux)
+    print("Reference flux for T=1 set to " + "%.1e" % vFlux + " ph/s")
+    
+    print('BPM4 sum = {:.4g} A for Slit 1 gap = {:.1f} um'.format(bpm4.sum_all.value, slit1GapDefault))
     
     return flux_df
 

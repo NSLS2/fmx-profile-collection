@@ -537,7 +537,7 @@ def set_energy(energy, hdcm_p_range=0.03, hdcm_p_points=51):
     height = epics.caget(prefix+'ArraySize1_RBV')
     ax3.imshow(image.reshape(height, width), cmap='jet')
 
-def hdcm_rock(hdcm_p_range=0.03, hdcm_p_points=51):
+def hdcm_rock(hdcm_p_range=0.03, hdcm_p_points=51, logging = True):
     """
     Scan HDCM crystal 2 pitch to maximize flux on BPM1
 
@@ -585,6 +585,11 @@ def hdcm_rock(hdcm_p_range=0.03, hdcm_p_points=51):
     peak_x, peak_y = yield from find_peak_inner(bpm1, hdcm.p, -hdcm_p_range, hdcm_p_range, hdcm_p_points, ax1)
     yield from bps.mv(hdcm.p, peak_x)
 
+    if logging:
+        print('Energy = {:.1f} eV'.format(energy))       
+        print('HDCM cr2 pitch = {:.3f} mrad'.format(hdcm.p.user_readback.value))
+        print('BPM1 sum = {:.4g} A'.format(bpm1.sum_all.value))
+        
     plt.close()
     
     
