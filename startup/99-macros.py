@@ -3,6 +3,8 @@ import numpy as np
 import bluesky.plans as bp
 import pandas as pd
 import datetime
+import logging
+import time
 
 def help_fmx():
     """List FMX beamline functions with a short explanation"""
@@ -65,6 +67,21 @@ def set_fluxBeam(flux):
     error = epics.caput('XF:17IDA-OP:FMX{Mono:DCM-dflux-M}', flux)
     
     return error
+
+
+def log_fmx(msgStr):
+    """
+    Appends msgStr to a logfine '/epics/iocs/notebook/notebooks/00_fmx_notebook.log'
+    
+    Parameters
+    ----------
+    
+    msgStr: Message String
+    """
+    LOG_FILENAME_FMX = '/epics/iocs/notebook/notebooks/00_fmx_notebook.log'
+    logStr = '{},{},'.format(time.strftime('%Y-%m-%d,%H:%M:%S'), time.time()) + msgStr + '\n'
+    with open(LOG_FILENAME_FMX, "a") as myfile:
+        myfile.write(logStr)
 
 
 def slit1_flux_reference(flux_df,slit1Gap):
@@ -136,7 +153,9 @@ def fmx_flux_reference(slit1GapList = [2000, 1000, 600, 400], slit1GapDefault = 
     """
     
     print(datetime.datetime.now())
-    print("Energy = " + "%.1f" % get_energy() + " eV")
+    msgStr = "Energy = " + "%.1f" % get_energy() + " eV"
+    print(msgStr)
+    log_fmx(msgStr)
     
     flux_df = pd.DataFrame(columns=['Slit 1 X gap [um]',
                                     'Slit 1 Y gap [um]',
@@ -156,9 +175,13 @@ def fmx_flux_reference(slit1GapList = [2000, 1000, 600, 400], slit1GapDefault = 
     
     vFlux = get_fluxKeithley()
     set_fluxBeam(vFlux)
-    print("Reference flux for T=1 set to " + "%.1e" % vFlux + " ph/s")
+    msgStr = "Reference flux for Slit 1 gap = " + "%d" % slit1GapDefault + " um for T=1 set to " + "%.1e" % vFlux + " ph/s"
+    print(msgStr)
+    log_fmx(msgStr)
     
-    print('BPM4 sum = {:.4g} A for Slit 1 gap = {:.1f} um'.format(bpm4.sum_all.value, slit1GapDefault))
+    msgStr = 'BPM4 sum = {:.4g} A for Slit 1 gap = {:.1f} um'.format(bpm4.sum_all.value, slit1GapDefault)
+    print(msgStr)
+    log_fmx(msgStr)
     
     return flux_df
 
