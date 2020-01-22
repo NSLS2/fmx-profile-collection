@@ -1,10 +1,14 @@
 import epics
 import numpy as np
+import bluesky.preprocessors as bpp
 import bluesky.plans as bp
+import bluesky.plan_stubs as bps
 import pandas as pd
 import datetime
 import logging
 import time
+import socket
+
 
 def help_fmx():
     """List FMX beamline functions with a short explanation"""
@@ -12,6 +16,7 @@ def help_fmx():
     print("""
     FMX beamline functions:
     
+    beamCenterAlign()    - Align goniometer and LSDC beam center to current beam position
     fmx_dose()      - Caluclate dose for a set of LSDC settings
     fmx_flux_reference()    - Get flux reference for a list of Slit 1 gap settings
     fmx_expTime_to_10MGy()  - Caluclate experiment time that delivers a dose of 10 MGy
@@ -35,16 +40,470 @@ def help_fmx():
 
     Use help() to get more info, e.g. help(set_energy)
     """)
+    
+    return
+
+
+def blStrGet():
+    """
+    Return beamline string
+    
+    blStr: 'AMX' or 'FMX'
+    
+    Beamline is determined by querying hostname
+    """
+    hostStr = socket.gethostname()
+    if hostStr == 'xf17id1-ca1':
+        blStr = 'FMX'
+    elif hostStr == 'xf17id2-ca1':
+        blStr = 'AMX'
+    else: 
+        print('Error - this code must be executed on one of the -ca1 machines')
+        blStr = -1
+        
+    return blStr
 
 
 def get_energy():
     """
     Returns the current photon energy in eV derived from the DCM Bragg angle
-    """
+    """ 
+    blStr = blStrGet()
+    if blStr == -1: return -1
     
-    energy = epics.caget('XF:17IDA-OP:FMX{Mono:DCM-Ax:E}Mtr.VAL')
+    sysStr = 'XF:17IDA-OP:' + blStr
+    devStr = '{Mono:DCM-Ax:E}'
+    mtrStr = 'Mtr.RBV'
+    pvStr = sysStr + devStr + mtrStr
+    energy = epics.caget(pvStr)
     
     return energy
+
+
+# Governor functions
+
+def govMsgGet(configStr = 'Robot'):
+    """
+    Returns Governor message
+
+    configStr: Governor configuration, 'Robot' or 'Human', default: 'Robot'
+    
+    Examples:
+    govMsgGet()
+    govMsgGet(configStr = 'Human')
+    """
+    blStr = blStrGet()
+    if blStr == -1: return -1
+    
+    sysStr = 'XF:17IDC-ES:' + blStr
+    devStr = '{Gov:' + configStr + '}'
+    stsStr = 'Sts:Msg-Sts'
+    pvStr = sysStr + devStr + stsStr
+    govMsg = epics.caget(pvStr)
+    
+    return govMsg
+
+
+def govStatusGet(stateStr, configStr = 'Robot'):
+    """
+    Returns the current active status for a Governor state
+    
+    stateStr: Governor short version state. Example: 'SA' for sample alignment
+    configStr: Governor configuration, 'Robot' or 'Human', default: 'Robot'
+
+    Example: govStatusGet('SA')
+    Example: govStatusGet('SA', configStr = 'Human')
+    """
+    blStr = blStrGet()
+    if blStr == -1: return -1
+    
+    if stateStr not in ['M', 'SE', 'SA', 'DA', 'XF', 'BL', 'BS', 'AB']:
+        print('stateStr must be one of: M, SE, SA, DA, XF, BL, BS, AB]')
+        return -1
+    
+    sysStr = 'XF:17IDC-ES:' + blStr
+    devStr = '{Gov:' + configStr + '-St:' + stateStr + '}'
+    stsStr = 'Sts:Active-Sts'
+    pvStr = sysStr + devStr + stsStr
+    govStatus = epics.caget(pvStr)
+    
+    return govStatus
+
+
+def govStateSet(stateStr, configStr = 'Robot'):
+    """
+    Sets Governor state
+
+    configStr: Governor configuration, 'Robot' or 'Human', default: 'Robot'
+    stateStr: one of ['M', 'SE', 'SA', 'DA', 'XF', 'BL', 'BS', 'AB']
+
+    Examples:
+    govStateSet('SA')
+    govStateSet('AB', configStr = 'Human')
+    """
+    blStr = blStrGet()
+    if blStr == -1: return -1
+
+    if stateStr not in ['M', 'SE', 'SA', 'DA', 'XF', 'BL', 'BS', 'AB']:
+        print('stateStr must be one of: M, SE, SA, DA, XF, BL, BS, AB]')
+        return -1
+    
+    sysStr = 'XF:17IDC-ES:' + blStr
+    devStr = '{Gov:' + configStr + '}'
+    cmdStr = 'Cmd:Go-Cmd'
+    pvStr = sysStr + devStr + cmdStr
+    epics.caput(pvStr, stateStr)
+    
+    while not govStatusGet(stateStr, configStr = configStr):
+        print(govMsgGet(configStr = configStr))
+        time.sleep(2)
+    print(govMsgGet(configStr = configStr))
+    
+    return
+
+
+def govPositionSet(position, positionerStr, positionTypeStr, configStr = 'Robot'):
+    """
+    Sets the Governor position for a positioner
+    
+    position: position value [motor units]
+    positionerStr: Governor short version of positioner. Example: 'gy' for Gonio Y
+    positionTypeStr: Type of position. Examples: 'Mount', 'Work', 'Park'
+    configStr: Governor configuration, 'Robot' or 'Human', default: 'Robot'
+    
+    Example PV: XF:17IDC-ES:FMX{Gov:Robot-Dev:gy}Pos:Work-Pos
+    
+    Examples:
+    govPositionSet(12913, 'gy', 'Work')
+    govPositionSet(12913, 'gy', 'Work', configStr = 'Human')
+    """
+    blStr = blStrGet()
+    if blStr == -1: return -1
+    
+    sysStr = 'XF:17IDC-ES:' + blStr
+    devStr = '{Gov:' + configStr + '-Dev:' + positionerStr + '}'
+    posStr = 'Pos:' + positionTypeStr + '-Pos'
+    pvStr = sysStr + devStr + posStr
+    epics.caput(pvStr, position)
+    
+    return
+
+
+def govPositionGet(positionerStr, positionTypeStr, configStr = 'Robot'):
+    """
+    Returns the current Governor position for a positioner
+    
+    position: position value [motor units]
+    positionerStr: Governor short version of positioner. Example: 'gy' for Gonio Y
+    positionTypeStr: Type of position. Examples: 'Mount', 'Work', 'Park'
+    configStr: Governor configuration, 'Robot' or 'Human', default: 'Robot'
+    
+    Example PV: XF:17IDC-ES:FMX{Gov:Robot-Dev:gy}Pos:Work-Pos
+    
+    Example: govPositionGet('gy', 'Work')
+    Example: govPositionGet('gy', 'Mount', configStr = 'Human')
+    """
+    blStr = blStrGet()
+    if blStr == -1: return -1
+    
+    sysStr = 'XF:17IDC-ES:' + blStr
+    devStr = '{Gov:' + configStr + '-Dev:' + positionerStr + '}'
+    posStr = 'Pos:' + positionTypeStr + '-Pos'
+    pvStr = sysStr + devStr + posStr
+    position = epics.caget(pvStr)
+    
+    return position
+
+
+# Beam align functions
+
+def detectorCoverPositionStatusGet():
+    """
+    Returns the status of the Detector Cover
+    
+    status: 0 (Not Open), 1 (Open) 
+    """
+    blStr = blStrGet()
+    if blStr == -1: return -1
+    
+    sysStr = 'XF:17IDC-ES:' + blStr
+    devStr = '{Det:' + blStr + '-Cover}'
+    cmdStr = 'Pos-Sts'
+    pvStr = sysStr + devStr + cmdStr
+    status = epics.caget(pvStr)
+    
+    return status
+
+
+def detectorCoverClose():
+    """
+    Closes the Detector Cover
+    """
+    blStr = blStrGet()
+    if blStr == -1: return -1
+    
+    sysStr = 'XF:17IDC-ES:' + blStr
+    devStr = '{Det:' + blStr + '-Cover}'
+    cmdStr = 'Cmd:Cls-Cmd'
+    pvStr = sysStr + devStr + cmdStr
+    epics.caput(pvStr, 1)
+    
+    while detectorCoverPositionStatusGet() != 0:
+        time.sleep(1)
+        
+    return
+
+
+def detectorCoverOpen():
+    """
+    Opens the Detector Cover
+    """
+    blStr = blStrGet()
+    if blStr == -1: return -1
+    
+    sysStr = 'XF:17IDC-ES:' + blStr
+    devStr = '{Det:' + blStr + '-Cover}'
+    cmdStr = 'Cmd:Opn-Cmd'
+    pvStr = sysStr + devStr + cmdStr
+    epics.caput(pvStr, 1)
+    
+    while detectorCoverPositionStatusGet() != 1:
+        time.sleep(1)
+    
+    return
+
+
+def shutterBCUPositionStatusGet():
+    """
+    Returns the status of the BCU Shutter
+    
+    status: 0 (Open), 1 (Closed), 2 (Undefined)
+    """
+    blStr = blStrGet()
+    if blStr == -1: return -1
+    
+    sysStr = 'XF:17IDC-ES:' + blStr
+    devStr = '{Gon:1-Sht}'
+    cmdStr = 'Pos-Sts'
+    pvStr = sysStr + devStr + cmdStr
+    status = epics.caget(pvStr)
+    
+    return status
+
+
+def shutterBCUClose():
+    """
+    Closes the BCU Shutter
+    """
+    blStr = blStrGet()
+    if blStr == -1: return -1
+    
+    sysStr = 'XF:17IDC-ES:' + blStr
+    devStr = '{Gon:1-Sht}'
+    cmdStr = 'Cmd:Cls-Cmd.PROC'
+    pvStr = sysStr + devStr + cmdStr
+    epics.caput(pvStr, 1)
+    
+    while shutterBCUPositionStatusGet() != 1:
+        time.sleep(1)
+        
+    return
+
+def shutterBCUOpen():
+    """
+    Opens the BCU Shutter
+    """
+    blStr = blStrGet()
+    if blStr == -1: return -1
+    
+    sysStr = 'XF:17IDC-ES:' + blStr
+    devStr = '{Gon:1-Sht}'
+    cmdStr = 'Cmd:Opn-Cmd.PROC'
+    pvStr = sysStr + devStr + cmdStr
+    epics.caput(pvStr, 1)
+    
+    while shutterBCUPositionStatusGet() != 0:
+        time.sleep(1)
+        
+    return
+
+
+def attenDefaultGet(energy):
+    """
+    Returns the default transmission to avoid saturation of the scintillator
+    
+    energy: X-ray energy [eV]
+    
+    The look up table is set in settings/set_energy setup FMX.ipynb
+    """
+    
+    attenLUT = read_lut('atten')
+    attenDefault = np.interp(energy,attenLUT['Energy'],attenLUT['Position'])
+    
+    return attenDefault
+
+
+def attenSet(transmission, attenuator = 'BCU'):
+    """
+    Sets the Attenuator transmission
+    """
+    blStr = blStrGet()
+    if blStr == -1: return -1
+    
+    sysStr = 'XF:17IDC-OP:' + blStr
+    devStr = '{Attn:' + attenuator + '}'
+    
+    # This energy PV is only used for debugging
+    cmdStr = 'Energy-SP'
+    pvStr = sysStr + devStr + cmdStr
+    epics.caput(pvStr, get_energy())
+
+    cmdStr = 'Trans-SP'
+    pvStr = sysStr + devStr + cmdStr
+    epics.caput(pvStr, transmission)
+    
+    cmdStr = 'Cmd:Set-Cmd.PROC'
+    pvStr = sysStr + devStr + cmdStr
+    epics.caput(pvStr,1)
+    
+    if attenuator == 'BCU':
+        cmdStr = 'attenDone'
+        pvStr = sysStr + devStr + cmdStr
+        while epics.caget(pvStr) != 1:
+            time.sleep(1)
+    
+    print('Attenuator = ' + attenuator + ', Transmission set to %.3f' % transmission)
+    return
+
+
+def attenGet(attenuator = 'BCU'):
+    """
+    Returns the Attenuator transmission
+    """
+    blStr = blStrGet()
+    if blStr == -1: return -1
+    
+    sysStr = 'XF:17IDC-OP:' + blStr
+    devStr = '{Attn:' + attenuator + '}'
+    cmdStr = 'Trans-SP'
+    pvStr = sysStr + devStr + cmdStr
+    transmission = epics.caget(pvStr)
+    
+    print('Attenuator = ' + attenuator + ', Transmission = %.3f' % transmission)
+    return transmission
+
+
+def beamCenterAlign():
+    """
+    Corrects alignment of goniometer and LSDC center point after a beam drift
+    
+    Requirements:
+    * No sample mounted. Goniometer will be moved inboard out of sample position
+    * Governor in SA state
+    """
+    # Which beamline?
+    blStr = blStrGet()
+    if blStr == -1: return -1
+
+    if not govStatusGet('SA'):
+        print('Not in Governor state SA, exiting')
+        return -1
+    
+    print('Closing detector cover')
+    detectorCoverClose()
+    
+    # Transition to Governor state AB (Auto-align Beam)
+    govStateSet('AB')
+    
+    # Set beam transmission that avoids scintillator saturation
+    # Default values are defined in settings as lookup table
+    attenDefault = attenDefaultGet( get_energy() )
+    if blStr == 'FMX':
+        attenOrgBCU = attenGet(attenuator='BCU')
+        attenOrgRI = attenGet(attenuator='RI')
+        attenSet(1, attenuator='BCU')
+        attenSet(attenDefault, attenuator='RI')
+    else:
+        attenOrgBCU = attenGet(attenuator='BCU')
+        attenSet(attenDefault, attenuator='BCU')
+        
+    # Retract backlight
+    RE(bps.mv(light.y,govPositionGet('li', 'Out')))
+    print('Light Y Out')
+    
+    # ROI1 centroid plugin does not work
+    # Copy ROI1 geometry to ROI4 and use ROI4 centroid plugin
+    cam_8.roi4.min_xyz.min_x.value = cam_8.roi1.min_xyz.min_x.value
+    cam_8.roi4.min_xyz.min_y.value = cam_8.roi1.min_xyz.min_y.value
+    cam_8.roi4.size.x.value = cam_8.roi1.size.x.value
+    cam_8.roi4.size.y.value = cam_8.roi1.size.y.value
+    
+    shutterBCUOpen()
+    print('BCU Shutter Open')
+    
+    # Hi Mag calibration [um/px]
+    # Screenshot from 2020-01-14 15:53:38.png: +100 um: 213 px
+    # Screenshot from 2020-01-14 15:53:04.png: -100 um: 948 px
+    hiMagCalY = 200 / (948-213)
+    print(hiMagCalY)
+    
+    # Lo Mag calibration Y [um/px]
+    # Screenshot from 2020-01-15 16:41:28.png: +300 um: 342 px
+    # Screenshot from 2020-01-15 16:41:53.png: -300 um: 898 px
+    loMagCalY = 600 / (898-342)
+    print(loMagCalY)
+    
+    # Get beam shift on Hi Mag
+    # Assume the LSDC centering crosshair is in the center of the FOV
+    # This works as long as cam_8 ROI1 does not hit the edge of the cam_8 image
+    beamHiMagDiffX = cam_8.stats4.centroid.x.value - (cam_8.roi4.size.x.value/2)
+    beamHiMagDiffY = cam_8.stats4.centroid.y.value - (cam_8.roi4.size.y.value/2)
+    
+    # Correct Mag 4 (cam_8 ROI1)
+    # Adjust cam_8 ROI1 min_y, LSDC uses this for the Mag4 FOV.
+    # This works as long as cam_8 ROI1 does not hit the edge of the cam_8 image
+    cam_8.roi1.min_xyz.min_x.value = cam_8.roi1.min_xyz.min_x.value + beamHiMagDiffX
+    cam_8.roi1.min_xyz.min_y.value = cam_8.roi1.min_xyz.min_y.value + beamHiMagDiffY
+    
+    # Correct Mag 3 (cam_8 ROI2)
+    cam_8.roi2.min_xyz.min_x.value = cam_8.roi2.min_xyz.min_x.value + beamHiMagDiffX
+    cam_8.roi2.min_xyz.min_y.value = cam_8.roi2.min_xyz.min_y.value + beamHiMagDiffY
+    
+    # Get beam shift on Lo Mag from Hi Mag shift and calibration factor ratio
+    beamLoMagDiffX = beamHiMagDiffX * hiMagCalY/loMagCalY
+    beamLoMagDiffY = beamHiMagDiffY * hiMagCalY/loMagCalY
+    
+    # Correct Mag 1 (cam_7 ROI2)
+    cam_7.roi2.min_xyz.min_x.value = cam_7.roi2.min_xyz.min_x.value + beamLoMagDiffX
+    cam_7.roi2.min_xyz.min_y.value = cam_7.roi2.min_xyz.min_y.value + beamLoMagDiffY
+    
+    # Correct Mag 2 (cam_7 ROI3)
+    cam_7.roi3.min_xyz.min_x.value = cam_7.roi3.min_xyz.min_x.value + beamLoMagDiffX
+    cam_7.roi3.min_xyz.min_y.value = cam_7.roi3.min_xyz.min_y.value + beamLoMagDiffY
+    
+    shutterBCUClose()
+    print('BCU Shutter Closed')
+    
+    # Transition to Governor state SA (Sample Alignment)
+    govStateSet('SA')
+    
+    # Adjust Gonio Y so rotation axis is again aligned to beam
+    gonioYDiff = beamHiMagDiffY * hiMagCalY
+    posGyOld = govPositionGet('gy', 'Work')
+    posGyNew = posGyOld + gonioYDiff
+    RE(bps.mv(gonio.gy, posGyNew))  # Move Gonio Y to new position
+    govPositionSet(posGyNew, 'gy', 'Work')  # Set Governor Gonio Y Work position to new value
+    print('Gonio Y difference = %.3f' % gonioYDiff)
+    
+    # Set proper beam transmission
+    # TODO Restore to prev transmission
+    if blStr == 'FMX':
+        attenSet(attenOrgBCU, attenuator='BCU')
+        attenSet(attenOrgRI, attenuator='RI')
+    else:
+        attenSet(attenOrgBCU, attenuator='BCU')
+    
+    return
 
 
 def get_fluxKeithley():

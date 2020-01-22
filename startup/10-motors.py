@@ -24,6 +24,10 @@ class XYZfMotor(Device):
 	z = Cpt(EpicsMotor, '-Ax:Zf}Mtr')
 
 
+class YMotor(Device):
+	y = Cpt(EpicsMotor, '-Ax:Y}Mtr')
+
+
 class Slits(Device):
 	b = Cpt(EpicsMotor, '-Ax:B}Mtr')
 	i = Cpt(EpicsMotor, '-Ax:I}Mtr')
@@ -129,6 +133,7 @@ kbm = KBMirror('XF:17IDC-OP:FMX{Mir', name='kbm')
 
 ## Microscope
 mic = XYMotor('XF:17IDC-ES:FMX{Mic:1', name='mic')
+light = YMotor('XF:17IDC-ES:FMX{Light:1', name='lightY')
 
 ## Goniometer Stack
 gonio = GoniometerStack('XF:17IDC-ES:FMX{Gon:1', name='gonio')

@@ -369,7 +369,7 @@ def wire_scan(detector, motor, start, stop, steps, sleep_time=1):
 LUT_fmt = "XF:17ID-ES:FMX{{Misc-LUT:{}}}{}-Wfm"
 LGP_fmt = "XF:17ID-ES:FMX{{Misc-LGP:{}}}Pos-SP"
 
-LUT_valid = (ivu_gap.gap, hdcm.g, hdcm.r, hdcm.p, hfm.y, hfm.x, hfm.pitch, kbm.hy, kbm.vx)
+LUT_valid = (ivu_gap.gap, hdcm.g, hdcm.r, hdcm.p, hfm.y, hfm.x, hfm.pitch, kbm.hy, kbm.vx, atten)
 LGP_valid = (kbm.hp, kbm.hx, kbm.vp, kbm.vy)
 
 LUT_valid_names = [m.name for m in LUT_valid] + ['ivu_gap_off']
