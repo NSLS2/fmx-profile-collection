@@ -16,19 +16,22 @@ def help_fmx():
     print("""
     FMX beamline functions:
     
-    beamCenterAlign()    - Align goniometer and LSDC beam center to current beam position
+    beam_center_align()     - Align goniometer and LSDC beam center to current beam position
+    center_pin()    - Center an alignment pin in Y
+    dcm_rock()      - Scan DCM crystal 2 pitch to maximize flux on BPM1
     fmx_dose()      - Caluclate dose for a set of LSDC settings
+    fmx_beamline_reference()    - Print beamline reference values
     fmx_flux_reference()    - Get flux reference for a list of Slit 1 gap settings
     fmx_expTime_to_10MGy()  - Caluclate experiment time that delivers a dose of 10 MGy
     focus_scan()    - Take microscope images with changing focus
     get_energy()    - Return HDCM energy in eV
     get_fluxKeithley()  - Returns Keithley diode current derived flux
-    hdcm_rock()     - Scan HDCM crystal 2 pitch to maximize flux on BPM1
     ivu_gap_scan()  - Scan IVU21 gap against a BPM intensity signal and go to peak
     mirror_scan()   - Pencil beam scan of HFM and KB
     rd3d_calc()     - Dose estimate with RADDOSE3D
     set_beamsize()  - CRL setting to expand beam
     set_energy()    - Set undulator, HDCM, HFM and KB settings for a certain energy
+    setE()          - Set all optics settings and align beam center for a certain energy
     set_fluxBeam()  - Sets the flux reference field
     set_influence() - Set HV power supply influence function voltage step
     simple_ascan()  - Scan a motor against a detector
@@ -38,7 +41,7 @@ def help_fmx():
     xf_detZ2recResolution() - Given detector to sample distance, returns resolution at edge
     xf_recResolution2detZ() - Given resolution at edge, returns detector to sample distance
 
-    Use help() to get more info, e.g. help(set_energy)
+    Use help() to get more info, e.g. help(setE)
     """)
     
     return
@@ -215,6 +218,40 @@ def govPositionGet(positionerStr, positionTypeStr, configStr = 'Robot'):
     return position
 
 
+# Shutter functions
+
+def shutter_eshutch_position_status_get():
+    """
+    Returns the status of the hutch shutter
+    
+    status: 0 (Open), 1 (Closed), 2 (Undefined)
+    """
+    blStr = blStrGet()
+    if blStr == -1: return -1
+    
+    sysStr = 'XF:17IDA-PPS:' + blStr
+    devStr = '{PSh}'
+    cmdStr = 'Pos-Sts'
+    pvStr = sysStr + devStr + cmdStr
+    status = epics.caget(pvStr)
+    
+    return status
+
+def shutter_foe_position_status_get():
+    """
+    Returns the status of the FOE shutter
+    
+    status: 0 (Open), 1 (Closed), 2 (Undefined)
+    """
+    sysStr = 'XF:17ID-PPS:' + 'FAMX'
+    devStr = '{Sh:FE}'
+    cmdStr = 'Pos-Sts'
+    pvStr = sysStr + devStr + cmdStr
+    status = epics.caget(pvStr)
+    
+    return status
+
+
 # Beam align functions
 
 def detectorCoverPositionStatusGet():
@@ -343,7 +380,7 @@ def attenDefaultGet(energy):
     return attenDefault
 
 
-def attenSet(transmission, attenuator = 'BCU'):
+def atten_set(transmission, attenuator = 'BCU'):
     """
     Sets the Attenuator transmission
     """
@@ -376,7 +413,7 @@ def attenSet(transmission, attenuator = 'BCU'):
     return
 
 
-def attenGet(attenuator = 'BCU'):
+def atten_get(attenuator = 'BCU'):
     """
     Returns the Attenuator transmission
     """
@@ -393,117 +430,47 @@ def attenGet(attenuator = 'BCU'):
     return transmission
 
 
-def beamCenterAlign():
+def cameraCalSet(camStr, calVal):
     """
-    Corrects alignment of goniometer and LSDC center point after a beam drift
+    Stores the calibration of a camera in an EPICS PV [um/px]
     
-    Requirements:
-    * No sample mounted. Goniometer will be moved inboard out of sample position
-    * Governor in SA state
+    camStr = 'LoMag' or 'HiMag'
+    calVal = Camera calibration in um/px. Assume X = Y
     """
-    # Which beamline?
     blStr = blStrGet()
     if blStr == -1: return -1
-
-    if not govStatusGet('SA'):
-        print('Not in Governor state SA, exiting')
+    
+    if camStr not in ['LoMag', 'HiMag']:
+        print('stateStr must be one of: LoMag, HiMag')
         return -1
     
-    print('Closing detector cover')
-    detectorCoverClose()
-    
-    # Transition to Governor state AB (Auto-align Beam)
-    govStateSet('AB')
-    
-    # Set beam transmission that avoids scintillator saturation
-    # Default values are defined in settings as lookup table
-    attenDefault = attenDefaultGet( get_energy() )
-    if blStr == 'FMX':
-        attenOrgBCU = attenGet(attenuator='BCU')
-        attenOrgRI = attenGet(attenuator='RI')
-        attenSet(1, attenuator='BCU')
-        attenSet(attenDefault, attenuator='RI')
-    else:
-        attenOrgBCU = attenGet(attenuator='BCU')
-        attenSet(attenDefault, attenuator='BCU')
-        
-    # Retract backlight
-    RE(bps.mv(light.y,govPositionGet('li', 'Out')))
-    print('Light Y Out')
-    
-    # ROI1 centroid plugin does not work
-    # Copy ROI1 geometry to ROI4 and use ROI4 centroid plugin
-    cam_8.roi4.min_xyz.min_x.value = cam_8.roi1.min_xyz.min_x.value
-    cam_8.roi4.min_xyz.min_y.value = cam_8.roi1.min_xyz.min_y.value
-    cam_8.roi4.size.x.value = cam_8.roi1.size.x.value
-    cam_8.roi4.size.y.value = cam_8.roi1.size.y.value
-    
-    shutterBCUOpen()
-    print('BCU Shutter Open')
-    
-    # Hi Mag calibration [um/px]
-    # Screenshot from 2020-01-14 15:53:38.png: +100 um: 213 px
-    # Screenshot from 2020-01-14 15:53:04.png: -100 um: 948 px
-    hiMagCalY = 200 / (948-213)
-    print(hiMagCalY)
-    
-    # Lo Mag calibration Y [um/px]
-    # Screenshot from 2020-01-15 16:41:28.png: +300 um: 342 px
-    # Screenshot from 2020-01-15 16:41:53.png: -300 um: 898 px
-    loMagCalY = 600 / (898-342)
-    print(loMagCalY)
-    
-    # Get beam shift on Hi Mag
-    # Assume the LSDC centering crosshair is in the center of the FOV
-    # This works as long as cam_8 ROI1 does not hit the edge of the cam_8 image
-    beamHiMagDiffX = cam_8.stats4.centroid.x.value - (cam_8.roi4.size.x.value/2)
-    beamHiMagDiffY = cam_8.stats4.centroid.y.value - (cam_8.roi4.size.y.value/2)
-    
-    # Correct Mag 4 (cam_8 ROI1)
-    # Adjust cam_8 ROI1 min_y, LSDC uses this for the Mag4 FOV.
-    # This works as long as cam_8 ROI1 does not hit the edge of the cam_8 image
-    cam_8.roi1.min_xyz.min_x.value = cam_8.roi1.min_xyz.min_x.value + beamHiMagDiffX
-    cam_8.roi1.min_xyz.min_y.value = cam_8.roi1.min_xyz.min_y.value + beamHiMagDiffY
-    
-    # Correct Mag 3 (cam_8 ROI2)
-    cam_8.roi2.min_xyz.min_x.value = cam_8.roi2.min_xyz.min_x.value + beamHiMagDiffX
-    cam_8.roi2.min_xyz.min_y.value = cam_8.roi2.min_xyz.min_y.value + beamHiMagDiffY
-    
-    # Get beam shift on Lo Mag from Hi Mag shift and calibration factor ratio
-    beamLoMagDiffX = beamHiMagDiffX * hiMagCalY/loMagCalY
-    beamLoMagDiffY = beamHiMagDiffY * hiMagCalY/loMagCalY
-    
-    # Correct Mag 1 (cam_7 ROI2)
-    cam_7.roi2.min_xyz.min_x.value = cam_7.roi2.min_xyz.min_x.value + beamLoMagDiffX
-    cam_7.roi2.min_xyz.min_y.value = cam_7.roi2.min_xyz.min_y.value + beamLoMagDiffY
-    
-    # Correct Mag 2 (cam_7 ROI3)
-    cam_7.roi3.min_xyz.min_x.value = cam_7.roi3.min_xyz.min_x.value + beamLoMagDiffX
-    cam_7.roi3.min_xyz.min_y.value = cam_7.roi3.min_xyz.min_y.value + beamLoMagDiffY
-    
-    shutterBCUClose()
-    print('BCU Shutter Closed')
-    
-    # Transition to Governor state SA (Sample Alignment)
-    govStateSet('SA')
-    
-    # Adjust Gonio Y so rotation axis is again aligned to beam
-    gonioYDiff = beamHiMagDiffY * hiMagCalY
-    posGyOld = govPositionGet('gy', 'Work')
-    posGyNew = posGyOld + gonioYDiff
-    RE(bps.mv(gonio.gy, posGyNew))  # Move Gonio Y to new position
-    govPositionSet(posGyNew, 'gy', 'Work')  # Set Governor Gonio Y Work position to new value
-    print('Gonio Y difference = %.3f' % gonioYDiff)
-    
-    # Set proper beam transmission
-    # TODO Restore to prev transmission
-    if blStr == 'FMX':
-        attenSet(attenOrgBCU, attenuator='BCU')
-        attenSet(attenOrgRI, attenuator='RI')
-    else:
-        attenSet(attenOrgBCU, attenuator='BCU')
+    sysStr = 'XF:17ID-ES:' + blStr
+    devStr = '{Misc-' + camStr + 'Cal}'
+    pvStr = sysStr + devStr
+    camCal = epics.caput(pvStr, calVal)
     
     return
+
+
+def cameraCalGet(camStr):
+    """
+    Returns the calibration of a camera [um/px]
+    
+    camStr = 'LoMag' or 'HiMag'
+    """
+    blStr = blStrGet()
+    if blStr == -1: return -1
+    
+    if camStr not in ['LoMag', 'HiMag']:
+        print('stateStr must be one of: LoMag, HiMag')
+        return -1
+    
+    sysStr = 'XF:17ID-ES:' + blStr
+    devStr = '{Misc-' + camStr + 'Cal}'
+    pvStr = sysStr + devStr
+    camCal = epics.caget(pvStr)
+    
+    return camCal
 
 
 def get_fluxKeithley():
@@ -567,15 +534,17 @@ def slit1_flux_reference(flux_df,slit1Gap):
     """
     
     slits1.x_gap.move(slit1Gap)
-    slits1.y_gap.move(slit1Gap)
+    slits1.y_gap.move(slit1Gap, wait=True)
+    time.sleep(1.0)
     
     flux_df.at[slit1Gap, 'Slit 1 X gap [um]'] = slit1Gap
     flux_df.at[slit1Gap, 'Slit 1 Y gap [um]'] = slit1Gap
     flux_df.at[slit1Gap, 'Keithley current [A]'] = keithley.value
     flux_df.at[slit1Gap, 'Keithley flux [ph/s]'] = get_fluxKeithley()
     flux_df.at[slit1Gap, 'BPM1 sum [A]'] = bpm1.sum_all.value
-    flux_df.at[slit1Gap, 'BPM4 sum [A]'] = bpm4.sum_all.value
-
+    # TEMP FIX: flux_df.at[slit1Gap, 'BPM4 sum [A]'] = bpm4.sum_all.value
+    flux_df.at[slit1Gap, 'BPM4 sum [A]'] = 0
+    
 
 def fmx_flux_reference(slit1GapList = [2000, 1000, 600, 400], slit1GapDefault = 1000):
     """
@@ -630,20 +599,97 @@ def fmx_flux_reference(slit1GapList = [2000, 1000, 600, 400], slit1GapDefault = 
     # Move back to default slit width
     # TODO: save reference before and return to it later?
     slits1.x_gap.move(slit1GapDefault)
-    slits1.y_gap.move(slit1GapDefault)
-    
+    slits1.y_gap.move(slit1GapDefault, wait=True)
+    time.sleep(1.0)
+
     vFlux = get_fluxKeithley()
     set_fluxBeam(vFlux)
     msgStr = "Reference flux for Slit 1 gap = " + "%d" % slit1GapDefault + " um for T=1 set to " + "%.1e" % vFlux + " ph/s"
     print(msgStr)
     log_fmx(msgStr)
     
-    msgStr = 'BPM4 sum = {:.4g} A for Slit 1 gap = {:.1f} um'.format(bpm4.sum_all.value, slit1GapDefault)
-    print(msgStr)
-    log_fmx(msgStr)
+    # TEMP FIX: # BPM4 in repair 
+    # TEMP FIX: msgStr = 'BPM4 sum = {:.4g} A for Slit 1 gap = {:.1f} um'.format(bpm4.sum_all.value, slit1GapDefault)
+    # TEMP FIX: print(msgStr)
+    # TEMP FIX: log_fmx(msgStr)
     
     return flux_df
 
+
+def fmx_beamline_reference():
+    """
+    Prints reference values and appends to the FMX log file
+    
+   
+    Examples
+    --------
+    fmx_beamline_reference()
+        
+    """
+    
+    print(datetime.datetime.now())
+    msgStr = "Energy = " + "%.2f" % get_energy() + " eV"
+    print(msgStr)
+    log_fmx(msgStr)
+    
+    msgStr = "Beam current = " + "%.2f" % beam_current.value + " mA"
+    print(msgStr)
+    log_fmx(msgStr)
+    
+    msgStr = "IVU gap = " + "%.1f" % ivu_gap.gap.user_readback.value + " um"
+    print(msgStr)
+    log_fmx(msgStr)
+    
+    msgStr = "XBPM2 posX = " + "%.2f" % xbpm2.x.value + " um"
+    print(msgStr)
+    log_fmx(msgStr)
+    
+    msgStr = "XBPM2 posY = " + "%.2f" % xbpm2.y.value + " um"
+    print(msgStr)
+    log_fmx(msgStr)
+    
+    msgStr = "XBPM2 total current = " + "%.2f" % xbpm2.total.value + " uA"
+    print(msgStr)
+    log_fmx(msgStr)
+    
+    msgStr = "HDCM pitch = " + "%.4f" % hdcm.p.user_readback.value + " mrad"
+    print(msgStr)
+    log_fmx(msgStr)
+
+    msgStr = "BPM1 posX = " + "%.2f" % bpm1.x.value
+    print(msgStr)
+    log_fmx(msgStr)
+    
+    msgStr = "BPM1 posY = " + "%.2f" % bpm1.y.value
+    print(msgStr)
+    log_fmx(msgStr)
+    
+    msgStr = "BPM1 total current = " + "%.3g" % bpm1.sum_all.value + " A"
+    print(msgStr)
+    log_fmx(msgStr)
+    
+    msgStr = "VKB tweak voltage = " + "%.3f" % vkb_piezo_tweak.value + " V"
+    print(msgStr)
+    log_fmx(msgStr)
+    
+    msgStr = "HKB tweak voltage = " + "%.3f" % hkb_piezo_tweak.value + " V"
+    print(msgStr)
+    log_fmx(msgStr)
+    
+    msgStr = "Gonio X = " + "%.1f" % gonio.gx.user_readback.value + " um"
+    print(msgStr)
+    log_fmx(msgStr)
+    
+    msgStr = "Gonio Y = " + "%.1f" % gonio.gy.user_readback.value + " um"
+    print(msgStr)
+    log_fmx(msgStr)
+    
+    msgStr = "Gonio Z = " + "%.1f" % gonio.gz.user_readback.value + " um"
+    print(msgStr)
+    log_fmx(msgStr)
+    
+    return
+    
 
 def set_crl(crlSlider,inOut):
     '''
@@ -818,7 +864,7 @@ def run_rd3d(inputFileName):
     return out
 
 def rd3d_calc(flux=3.5e12, energy=12.66,
-              beamType='GAUSSIAN', fwhmX=2, fwhmY=1, collimationX=10, collimationY=10,
+              beamType='GAUSSIAN', fwhmX=1, fwhmY=2, collimationX=10, collimationY=10,
               wedge=0, exposureTime=1,
               translatePerDegX=0, translatePerDegY=0, translatePerDegZ=0,
               startOffsetX=0, startOffsetY=0, startOffsetZ=0,
