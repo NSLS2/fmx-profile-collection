@@ -70,16 +70,7 @@ def get_energy():
     """
     Returns the current photon energy in eV derived from the DCM Bragg angle
     """ 
-    blStr = blStrGet()
-    if blStr == -1: return -1
-    
-    sysStr = 'XF:17IDA-OP:' + blStr
-    devStr = '{Mono:DCM-Ax:E}'
-    mtrStr = 'Mtr.RBV'
-    pvStr = sysStr + devStr + mtrStr
-    energy = epics.caget(pvStr)
-    
-    return energy
+    return hdcm.e.user_readback.get()
 
 
 # Shutter functions
@@ -140,36 +131,23 @@ def detectorCoverClose():
     """
     Closes the Detector Cover
     """
-    blStr = blStrGet()
-    if blStr == -1: return -1
+    yield from bps.mv(cover_detector.close, 1)
     
-    sysStr = 'XF:17IDC-ES:' + blStr
-    devStr = '{Det:' + blStr + '-Cover}'
-    cmdStr = 'Cmd:Cls-Cmd'
-    pvStr = sysStr + devStr + cmdStr
-    epics.caput(pvStr, 1)
+    while cover_detector.status.get() == 1:
+        #print(cover_detector.status.get())
+        time.sleep(0.5)
     
-    while detectorCoverPositionStatusGet() != 0:
-        time.sleep(1)
-        
     return
-
 
 def detectorCoverOpen():
     """
     Opens the Detector Cover
     """
-    blStr = blStrGet()
-    if blStr == -1: return -1
+    yield from bps.mv(cover_detector.open, 1)
     
-    sysStr = 'XF:17IDC-ES:' + blStr
-    devStr = '{Det:' + blStr + '-Cover}'
-    cmdStr = 'Cmd:Opn-Cmd'
-    pvStr = sysStr + devStr + cmdStr
-    epics.caput(pvStr, 1)
-    
-    while detectorCoverPositionStatusGet() != 1:
-        time.sleep(1)
+    while cover_detector.status.get() != 1:
+        #print(cover_detector.status.get())
+        time.sleep(0.5)
     
     return
 
