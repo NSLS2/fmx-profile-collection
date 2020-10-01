@@ -5,12 +5,16 @@ class Transmission(Device):
     transmission = Cpt(EpicsSignal, 'Trans-SP')
     set_trans = Cpt(EpicsSignal, 'Cmd:Set-Cmd.PROC')
 
+## Dummy Attenuator - for read/write_lut() and XF:17ID-ES:FMX{Misc-LUT:atten}X-Wfm/Y-Wfm
+class AttenuatorLUT(Device):
+    done = Cpt(EpicsSignalRO, '}attenDone')
+
 class AttenuatorBCU(Device):
     a1 = Cpt(EpicsMotor, '-Ax:1}Mtr')
     a2 = Cpt(EpicsMotor, '-Ax:2}Mtr')
     a3 = Cpt(EpicsMotor, '-Ax:3}Mtr')
     a4 = Cpt(EpicsMotor, '-Ax:4}Mtr')
-    done = Cpt(EpicsSignalRO, 'attenDone')
+    done = Cpt(EpicsSignalRO, '}attenDone')
 
 class RISlider(Device):
     mv_in = Cpt(EpicsSignal, 'Cmd:In-Cmd')
@@ -31,22 +35,53 @@ class AttenuatorRI(Device):
     f11 = Cpt(RISlider, '11}')
     f12 = Cpt(RISlider, '12}')
 
+class Transfocator(Device):
+    c1 = Cpt(RISlider, '01}')
+    c2 = Cpt(RISlider, '02}')
+    c3 = Cpt(RISlider, '03}')
+    c4 = Cpt(RISlider, '04}')
+    c5 = Cpt(RISlider, '05}')
+    c6 = Cpt(RISlider, '06}')
+    c7 = Cpt(RISlider, '07}')
+    c8 = Cpt(RISlider, '08}')
+    c9 = Cpt(RISlider, '09}')
+    c10 = Cpt(RISlider, '10}')
+    c11 = Cpt(RISlider, '11}')
+    c12 = Cpt(RISlider, '12}')
+    vs = Cpt(RISlider, '02}')  # 1st bank with V slit
+    v2a = Cpt(RISlider, '04}') # 1st bank with 2 V lenses
+    v1a = Cpt(RISlider, '06}') # 1st bank with 1 V lens
+    v1b = Cpt(RISlider, '08}') # 2nd bank with 1 V lens
+    hs = Cpt(RISlider, '01}')  # 1st bank with H slit
+    h4a = Cpt(RISlider, '03}') # 1st bank with 4 H lenses
+    h2a = Cpt(RISlider, '05}') # 1st bank with 2 H lenses
+    h1a = Cpt(RISlider, '07}') # 1st bank with 1 H lens
+    h1b = Cpt(RISlider, '09}') # 2nd bank with 1 H lens
+
 #######################################################
 ### FMX
 #######################################################
 
 
 ## BCU Transmission
-trans_bcu = Transmission('XF:17IDC-OP:FMX{Attn:BCU}', name='BCU_Transmission',
+trans_bcu = Transmission('XF:17IDC-OP:FMX{Attn:BCU}', name='trans_bcu',
                          read_attrs=['transmission'])
 ## RI Transmission
-trans_ri = Transmission('XF:17IDC-OP:FMX{Attn:RI}', name='RI_Transmission',
+trans_ri = Transmission('XF:17IDC-OP:FMX{Attn:RI}', name='trans_ri',
                         read_attrs=['transmission'])
 
+## Dummy Attenuator - for read/write_lut() and XF:17ID-ES:FMX{Misc-LUT:atten}X-Wfm/Y-Wfm
+atten = AttenuatorLUT('XF:17IDC-OP:FMX{Attn:BCU', name='atten',
+                          read_attrs=['done'])
+
 ## BCU Attenuator
-atten_bcu = AttenuatorBCU('XF:17IDC-OP:FMX{Attn:BCU', name='BCU_Attenuator',
+atten_bcu = AttenuatorBCU('XF:17IDC-OP:FMX{Attn:BCU', name='atten_bcu',
                           read_attrs=['done'])
 
 ## RI Attenuator
-atten_ri = AttenuatorRI('XF:17IDC-OP:FMX{Attn:', name='RI_Attenuator',
+atten_ri = AttenuatorRI('XF:17IDC-OP:FMX{Attn:', name='atten_ri',
+                          read_attrs=[])
+
+## RI Transfocator
+transfocator = Transfocator('XF:17IDC-OP:FMX{CRL:', name='transfocator',
                           read_attrs=[])

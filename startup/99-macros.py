@@ -207,7 +207,7 @@ def shutterBCUOpen():
     return
 
 
-def attenDefaultGet(energy):
+def transDefaultGet(energy):
     """
     Returns the default transmission to avoid saturation of the scintillator
     
@@ -216,59 +216,50 @@ def attenDefaultGet(energy):
     The look up table is set in settings/set_energy setup FMX.ipynb
     """
     
-    attenLUT = read_lut('atten')
-    attenDefault = np.interp(energy,attenLUT['Energy'],attenLUT['Position'])
+    # This reads from:
+    # XF:17ID-ES:FMX{Misc-LUT:atten}X-Wfm
+    # XF:17ID-ES:FMX{Misc-LUT:atten}Y-Wfm
+    # 
+    # atten is a dummy motor just for this purpose.
+    # To be replaced by trans_bcu and corresponding new PVs
     
-    return attenDefault
+    transLUT = read_lut('atten')
+    transDefault = np.interp(energy,transLUT['Energy'],transLUT['Position'])
+    
+    return transDefault
 
 
-def atten_set(transmission, attenuator = 'BCU'):
+# TODO: This is a plan. not macro - sort somewhere else?
+def trans_set(transmission, trans = trans_bcu):
     """
     Sets the Attenuator transmission
     """
-    blStr = blStrGet()
-    if blStr == -1: return -1
     
-    sysStr = 'XF:17IDC-OP:' + blStr
-    devStr = '{Attn:' + attenuator + '}'
+    e_dcm = get_energy()
+    if e_dcm < 5000 or e_dcm > 30000:
+        print('Monochromator energy out of range. Must be within 5000 - 30000 eV. Exiting.')
+        return
     
-    # This energy PV is only used for debugging
-    cmdStr = 'Energy-SP'
-    pvStr = sysStr + devStr + cmdStr
-    epics.caput(pvStr, get_energy())
-
-    cmdStr = 'Trans-SP'
-    pvStr = sysStr + devStr + cmdStr
-    epics.caput(pvStr, transmission)
+    yield from bps.mv(trans.energy, e_dcm) # This energy PV is only used for debugging
+    yield from bps.mv(trans.transmission, transmission)
+    yield from bps.mv(trans.set_trans, 1)
     
-    cmdStr = 'Cmd:Set-Cmd.PROC'
-    pvStr = sysStr + devStr + cmdStr
-    epics.caput(pvStr,1)
+    if trans == trans_bcu:
+        while atten_bcu.done != 1:
+            time.sleep(0.5)
     
-    if attenuator == 'BCU':
-        cmdStr = 'attenDone'
-        pvStr = sysStr + devStr + cmdStr
-        while epics.caget(pvStr) != 1:
-            time.sleep(1)
-    
-    print('Attenuator = ' + attenuator + ', Transmission set to %.3f' % transmission)
+    print('Attenuator = ' + trans.name + ', Transmission set to %.3f' % trans.transmission.value)
     return
 
 
-def atten_get(attenuator = 'BCU'):
+def trans_get(trans = trans_bcu):
     """
     Returns the Attenuator transmission
     """
-    blStr = blStrGet()
-    if blStr == -1: return -1
     
-    sysStr = 'XF:17IDC-OP:' + blStr
-    devStr = '{Attn:' + attenuator + '}'
-    cmdStr = 'Trans-SP'
-    pvStr = sysStr + devStr + cmdStr
-    transmission = epics.caget(pvStr)
+    transmission = trans.transmission.get()
     
-    print('Attenuator = ' + attenuator + ', Transmission = %.3f' % transmission)
+    print('Attenuator = ' + trans.name + ', Transmission = %.3f' % transmission)
     return transmission
 
 
@@ -372,42 +363,32 @@ def set_beamsize(sizeV, sizeH):
     set_beamsize('V1','H0')
     """
     
-    CRL_VS ='XF:17IDC-OP:FMX{CRL:02}Cmd:'  # 1st bank with V slit
-    CRL_V2A='XF:17IDC-OP:FMX{CRL:04}Cmd:'  # 1st bank with 2 V lenses
-    CRL_V1A='XF:17IDC-OP:FMX{CRL:08}Cmd:'  # 1st bank with 1 V lens. Flipped for debugging
-    CRL_V1B='XF:17IDC-OP:FMX{CRL:06}Cmd:'  # 2nd bank with 1 V lens. Flipped for debugging
-    CRL_HS ='XF:17IDC-OP:FMX{CRL:01}Cmd:'  # 1st bank with H slit
-    CRL_H4A='XF:17IDC-OP:FMX{CRL:03}Cmd:'  # 1st bank with 4 H lenses
-    CRL_H2A='XF:17IDC-OP:FMX{CRL:05}Cmd:'  # 1st bank with 2 H lenses
-    CRL_H1A='XF:17IDC-OP:FMX{CRL:07}Cmd:'  # 1st bank with 1 H lens
-    CRL_H1B='XF:17IDC-OP:FMX{CRL:09}Cmd:'  # 2nd bank with 1 H lens
-    
     if get_energy()<9000.0:
         print('Warning: For energies < 9 keV, use KB mirrors to defocus, not CRLs')
     
     if sizeV == 'V0':
-        set_crl(CRL_VS,0)
-        set_crl(CRL_V2A,0)
-        set_crl(CRL_V1A,0)
-        set_crl(CRL_V1B,0)
+        yield from bps.mv(transfocator.vs.mv_out, 1)
+        yield from bps.mv(transfocator.v2a.mv_out, 1)
+        yield from bps.mv(transfocator.v1a.mv_out, 1)
+        yield from bps.mv(transfocator.v1b.mv_out, 1)
     elif sizeV == 'V1':
-        set_crl(CRL_VS,1)
-        set_crl(CRL_V2A,0)
-        set_crl(CRL_V1A,0)
-        set_crl(CRL_V1B,1)
+        yield from bps.mv(transfocator.vs.mv_in, 1)
+        yield from bps.mv(transfocator.v2a.mv_out, 1)
+        yield from bps.mv(transfocator.v1a.mv_out, 1)
+        yield from bps.mv(transfocator.v1b.mv_in, 1)
     else:
         print("Error: Vertical size argument has to be \'V0\' or  \'V1\'")
     
     if sizeH == 'H0':
-        set_crl(CRL_H4A,0)
-        set_crl(CRL_H2A,0)
-        set_crl(CRL_H1A,0)
-        set_crl(CRL_H1B,0)
+        yield from bps.mv(transfocator.h4a.mv_out, 1)
+        yield from bps.mv(transfocator.h2a.mv_out, 1)
+        yield from bps.mv(transfocator.h1a.mv_out, 1)
+        yield from bps.mv(transfocator.h1b.mv_out, 1)
     elif sizeH == 'H1':
-        set_crl(CRL_H4A,0)
-        set_crl(CRL_H2A,1)
-        set_crl(CRL_H1A,1)
-        set_crl(CRL_H1B,1)
+        yield from bps.mv(transfocator.h4a.mv_out, 1)
+        yield from bps.mv(transfocator.h2a.mv_in, 1)
+        yield from bps.mv(transfocator.h1a.mv_in, 1)
+        yield from bps.mv(transfocator.h1b.mv_in, 1)
     else:
         print("Error: Horizontal size argument has to be \'H0\' or  \'H1\'")
     

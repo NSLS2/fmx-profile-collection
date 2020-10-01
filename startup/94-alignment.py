@@ -7,13 +7,23 @@ import bluesky.plan_stubs as bps
 import numpy as np
 
 
-def centroid_avg(cam):
-    # Read centroids 10x and use mean
+def centroid_avg(stats):
+    """
+    Read centroid X and Y 10x and return mean of centroids.
+    
+    stats : stats method of ophyd camera object to use, e.g. cam_8.stats4
+    
+    Examples
+    --------
+    centroid_avg(cam_8.stats4)
+    centroidY = centroid_avg(cam_8.stats4)[1]
+    """
+    
     centroidXArr = np.zeros(10)
     centroidYArr = np.zeros(10)
     for i in range(0, 10):
-        centroidXArr[i] = cam.stats4.centroid.x.value
-        centroidYArr[i] = cam.stats4.centroid.y.value
+        centroidXArr[i] = stats.centroid.x.value
+        centroidYArr[i] = stats.centroid.y.value
         # print('Centroid X = {:.6g} px'.format(centroidXArr[i]), ', Centroid Y = {:.6g} px'.format(centroidYArr[i]))
         time.sleep(0.2)
     CentroidX = centroidXArr.mean()
@@ -24,7 +34,7 @@ def centroid_avg(cam):
     return CentroidX, CentroidY
 
 
-def beam_center_align(attenSet='All'):
+def beam_center_align(transSet='All'):
     """
     Corrects alignment of goniometer and LSDC center point after a beam drift
     
@@ -35,29 +45,29 @@ def beam_center_align(attenSet='All'):
     
     Parameters
     ----------
-    attenSet: FMX only: Set to 'RI' if there is a problem with the BCU attenuator.
+    transSet: FMX only: Set to 'RI' if there is a problem with the BCU attenuator.
               FMX only: Set to 'BCU' if there is a problem with the RI attenuator.
-              Set to 'None' if there are problems with all = attenuators.
+              Set to 'None' if there are problems with all attenuators.
               Operator then has to choose a flux by hand that will not saturate scinti
               default = 'All'
               
     Examples
     --------
     RE(beam_center_align())
-    RE(beam_center_align(attenSet='None'))
-    RE(beam_center_align(attenSet='RI'))
+    RE(beam_center_align(transSet='None'))
+    RE(beam_center_align(transSet='RI'))
     """
     # Which beamline?
     blStr = blStrGet()
     if blStr == -1: return -1
 
     if blStr == 'FMX':
-        if attenSet not in ['All', 'None', 'BCU', 'RI']:
-            print('attenSet must be one of: All, None, BCU, RI')
+        if transSet not in ['All', 'None', 'BCU', 'RI']:
+            print('transSet must be one of: All, None, BCU, RI')
             return -1
     else:
-        if attenSet not in ['All', 'None']:
-            print('attenSet must be one of: All, None')
+        if transSet not in ['All', 'None']:
+            print('transSet must be one of: All, None')
             return -1
         
     if not govStatusGet('SA'):
@@ -72,21 +82,21 @@ def beam_center_align(attenSet='All'):
     
     # Set beam transmission that avoids scintillator saturation
     # Default values are defined in settings as lookup table
-    if attenSet != 'None':
-        attenDefault = attenDefaultGet( get_energy() )
+    if transSet != 'None':
+        transDefault = transDefaultGet( get_energy() )
         if blStr == 'FMX':
-            if attenSet in ['All', 'BCU']:
-                attenOrgBCU = atten_get(attenuator='BCU')
-            if attenSet in ['All', 'RI']:
-                attenOrgRI = atten_get(attenuator='RI')
-                atten_set(attenDefault, attenuator='RI')
-            if attenSet == 'BCU':
-                atten_set(attenDefault, attenuator='BCU')
-            if attenSet == 'All':
-                atten_set(1, attenuator='BCU')
+            if transSet in ['All', 'BCU']:
+                transOrgBCU = trans_get(trans=trans_bcu)
+            if transSet in ['All', 'RI']:
+                transOrgRI = trans_get(trans=trans_ri)
+                yield from trans_set(transDefault, trans=trans_ri)
+            if transSet == 'BCU':
+                yield from trans_set(transDefault, trans=trans_bcu)
+            if transSet == 'All':
+                yield from trans_set(1, trans=trans_bcu)
         else:
-            attenOrgBCU = atten_get(attenuator='BCU')
-            atten_set(attenDefault, attenuator='BCU')
+            transOrgBCU = trans_get(trans=trans_bcu)
+            yield from trans_set(transDefault, trans=trans_bcu)
             
     # Retract backlight
     yield from bps.mv(light.y,govPositionGet('li', 'Out'))
@@ -99,25 +109,16 @@ def beam_center_align(attenSet='All'):
     cam_8.roi4.size.x.value = cam_8.roi1.size.x.value
     cam_8.roi4.size.y.value = cam_8.roi1.size.y.value
     
-    shutterBCUOpen()
+    yield from bps.mv(shutter_bcu.open, 1)
     print('BCU Shutter Open')
     
     # Camera calibration [um/px]
-    hiMagCal = cameraCalGet('HiMag')
-    loMagCal = cameraCalGet('LoMag')
+    hiMagCal = BL_calibration.HiMagCal.value
+    loMagCal = BL_calibration.LoMagCal.value
     
-    # Read centroids 10x and use mean
-    centroidXArr = np.zeros(10)
-    centroidYArr = np.zeros(10)
-    for i in range(0, 10):
-        centroidXArr[i] = cam_8.stats4.centroid.x.value
-        centroidYArr[i] = cam_8.stats4.centroid.y.value
-        # print('Centroid X = {:.6g} px'.format(centroidXArr[i]), ', Centroid Y = {:.6g} px'.format(centroidYArr[i]))
-        time.sleep(0.2)
-    beamHiMagCentroidX = centroidXArr.mean()
-    beamHiMagCentroidY = centroidYArr.mean()
-    print('Mean centroid X = {:.6g} px'.format(beamHiMagCentroidX))
-    print('Mean centroid Y = {:.6g} px'.format(beamHiMagCentroidY))
+    # Read centroids
+    beamHiMagCentroidX = centroid_avg(cam_8)[0]
+    beamHiMagCentroidY = centroid_avg(cam_8)[1]
 
     # Get beam shift on Hi Mag
     # Assume the LSDC centering crosshair is in the center of the FOV
@@ -147,7 +148,7 @@ def beam_center_align(attenSet='All'):
     cam_7.roi3.min_xyz.min_x.value = cam_7.roi3.min_xyz.min_x.value + beamLoMagDiffX
     cam_7.roi3.min_xyz.min_y.value = cam_7.roi3.min_xyz.min_y.value + beamLoMagDiffY
     
-    shutterBCUClose()
+    yield from bps.mv(shutter_bcu.close, 1)
     print('BCU Shutter Closed')
     
     # Transition to Governor state SA (Sample Alignment)
@@ -162,17 +163,17 @@ def beam_center_align(attenSet='All'):
     print('Gonio Y difference = %.3f' % gonioYDiff)
     
     # Set previous beam transmission
-    if attenSet != 'None':
+    if transSet != 'None':
         if blStr == 'FMX':
-            if attenSet in ['All', 'RI']:
-                atten_set(attenOrgRI, attenuator='RI')
-            if attenSet in ['All', 'BCU']:
-                atten_set(attenOrgBCU, attenuator='BCU')
+            if transSet in ['All', 'RI']:
+                yield from trans_set(transOrgRI, trans=trans_ri)
+            if transSet in ['All', 'BCU']:
+                yield from trans_set(transOrgBCU, trans=trans_bcu)
         else:
-            atten_set(attenOrgBCU, attenuator='BCU')
+            yield from trans_set(transOrgBCU, trans=trans_bcu)
     
     
-def center_pin():
+def center_pin(cam=cam_8):
     """
     Centers a pin in Y
     
@@ -180,52 +181,57 @@ def center_pin():
     ------------
     * Alignment pin mounted. Pin should be aligned in X to within 0.25 of the Mag3 width
     
+    Parameters
+    ----------
+    cam: ophyd camera device. Should be cam_7 or cam_8 (default)
+    
     Examples
     --------
     RE(center_pin())
+    RE(center_pin(cam_7))
     """
     
-    # Copy ROI2 geometry (HiMag Mag3) to ROI4 and use ROI4 centroid plugin
-    cam_8.roi4.min_xyz.min_x.value = cam_8.roi2.min_xyz.min_x.value
-    cam_8.roi4.min_xyz.min_y.value = cam_8.roi2.min_xyz.min_y.value
-    cam_8.roi4.size.x.value = cam_8.roi2.size.x.value * 0.25
-    cam_8.roi4.size.y.value = cam_8.roi2.size.y.value
-    cam_8.roi4.min_xyz.min_x.value = cam_8.roi2.min_xyz.min_x.value + cam_8.roi2.size.x.value/2 - cam_8.roi4.size.x.value/2
+    if cam not in [cam_7, cam_8]:
+        print('cam must be one of: [cam_7, cam_8]')
+        return -1
+    
+    # Copy ROI2 geometry (HiMag Mag3 and LoMag Mag1) to ROI4 and use ROI4 centroid plugin
+    cam.roi4.min_xyz.min_x.value = cam.roi2.min_xyz.min_x.value
+    cam.roi4.min_xyz.min_y.value = cam.roi2.min_xyz.min_y.value
+    cam.roi4.size.x.value = cam.roi2.size.x.value * 0.25
+    cam.roi4.size.y.value = cam.roi2.size.y.value
+    cam.roi4.min_xyz.min_x.value = cam.roi2.min_xyz.min_x.value + cam.roi2.size.x.value/2 - cam.roi4.size.x.value/2
     
     # Invert camera image, so dark pin on light image becomes a peak
-    pvStr = 'XF:17IDC-ES:FMX{Cam:8}Proc1:Scale'
-    epics.caput(pvStr,'-1')
+    cam.proc1.scale.value = -1
     
     # High threshold, so AD centroid doesn't interpret background
-    cam_8ThresholdOld = cam_8.stats4.centroid_threshold.value
-    cam_8.stats4.centroid_threshold.value = 150
+    camThresholdOld = cam.stats4.centroid_threshold.value
+    cam.stats4.centroid_threshold.value = 150
     
     # Get centroids at Omega = 0, 90, 180, 270 deg
     yield from bps.mv(gonio.o,0)
     time.sleep(2)
-    c0 = centroid_avg(cam_8)[1]
+    c0 = centroid_avg(cam.stats4)[1]
     
     yield from bps.mv(gonio.o,90)
     time.sleep(2)
-    c90 = centroid_avg(cam_8)[1]
+    c90 = centroid_avg(cam.stats4)[1]
     
     yield from bps.mv(gonio.o,180)
     time.sleep(2)
-    c180 = centroid_avg(cam_8)[1]
+    c180 = centroid_avg(cam.stats4)[1]
     
     yield from bps.mv(gonio.o,270)
     time.sleep(2)
-    c270 = centroid_avg(cam_8)[1]
-    
-    # Calculate offsets
-    hiMagCal = cameraCalGet('HiMag')
+    c270 = centroid_avg(cam.stats4)[1]
     
     # Center offset Y
-    offsY = ((c180 - c0))/2 * hiMagCal
+    offsY = ((c180 - c0))/2 * camCal
     print('Y offset = {:.6g} um'.format(offsY))
     
     # Center offset Z
-    offsZ = ((c270 - c90))/2 * hiMagCal
+    offsZ = ((c270 - c90))/2 * camCal
     print('Z offset = {:.6g} um'.format(offsZ))
     
     # Move pin to center
@@ -233,8 +239,79 @@ def center_pin():
     yield from bps.mvr(gonio.pz,offsZ)
     
     # De-invert image
-    pvStr = 'XF:17IDC-ES:FMX{Cam:8}Proc1:Scale'
-    epics.caput(pvStr,'1')
+    cam.proc1.scale.value = 1
+    
+    # Set thresold to previous value
+    cam.stats4.centroid_threshold.value = camThresholdOld
+    
+    
+def gonio_axis_align():
+    """
+    Center crosshair on pin
+    
+    Requirements
+    ------------
+    * Alignment pin mounted and centered. Pin should be aligned in X to within 0.25 of the Mag3 width
+    * Governor in SA state
+    * LoMag and HiMag Scale and Offset need to be enabled in Proc1
+        * XF:17IDC-ES:FMX{Cam:7}Proc1:EnableOffsetScale
+        * XF:17IDC-ES:FMX{Cam:8}Proc1:EnableOffsetScale
+    """
+    
+    # Invert camera image, so dark pin on light image becomes a peak
+    cam_7.proc1.scale.value = -1
+    cam_8.proc1.scale.value = -1
+    
+    # High threshold, so AD centroid doesn't interpret background
+    cam_8ThresholdOld = cam_8.stats4.centroid_threshold.value
+    cam_8.stats4.centroid_threshold.value = 150
+    cam_7ThresholdOld = cam_7.stats4.centroid_threshold.value
+    cam_7.stats4.centroid_threshold.value = 150
+    
+    # HiMag
+    # Copy ROI2 geometry (HiMag Mag3) to ROI4 and use ROI4 centroid plugin
+    cam_8.roi4.min_xyz.min_x.value = cam_8.roi2.min_xyz.min_x.value
+    cam_8.roi4.min_xyz.min_y.value = cam_8.roi2.min_xyz.min_y.value
+    cam_8.roi4.size.x.value = cam_8.roi2.size.x.value * 0.20
+    cam_8.roi4.size.y.value = cam_8.roi2.size.y.value
+    cam_8.roi4.min_xyz.min_x.value = cam_8.roi2.min_xyz.min_x.value + cam_8.roi2.size.x.value/2 - cam_8.roi4.size.x.value/2
+    
+    # LoMag
+    # Copy ROI2 geometry (LoMag Mag1) to ROI4 and use ROI4 centroid plugin
+    cam_7.roi4.min_xyz.min_x.value = cam_7.roi2.min_xyz.min_x.value
+    cam_7.roi4.min_xyz.min_y.value = cam_7.roi2.min_xyz.min_y.value
+    cam_7.roi4.size.x.value = cam_7.roi2.size.x.value * 0.05
+    cam_7.roi4.size.y.value = cam_7.roi2.size.y.value
+    cam_7.roi4.min_xyz.min_x.value = cam_7.roi2.min_xyz.min_x.value + cam_7.roi2.size.x.value/2 - cam_7.roi4.size.x.value/2
+    
+    centerPinYHiMag0 = centroid_avg(cam_8.stats4)[1]
+    centerPinYLoMag0 = centroid_avg(cam_7.stats4)[1]
+    yield from bps.mvr(gonio.o,180)
+    time.sleep(2)
+    centerPinYHiMag180 = centroid_avg(cam_8.stats4)[1]
+    centerPinYLoMag180 = centroid_avg(cam_7.stats4)[1]
+    centerPinYHiMag = (centerPinYHiMag0 + centerPinYHiMag180)/2
+    centerPinYLoMag = (centerPinYLoMag0 + centerPinYLoMag180)/2
+
+    centerPinOffsYHiMag = centerPinYHiMag - cam_8.roi4.size.y.value / 2
+    centerPinOffsYLoMag = centerPinYLoMag - cam_7.roi4.size.y.value / 2
+    
+    # Correct Mag 3 (cam_8 ROI2)
+    cam_8.roi2.min_xyz.min_y.value = cam_8.roi2.min_xyz.min_y.value + centerPinOffsYHiMag
+    # Correct Mag 4 (cam_8 ROI1)
+    cam_8.roi1.min_xyz.min_y.value = cam_8.roi2.min_xyz.min_y.value + (cam_8.roi2.size.y.value-cam_8.roi1.size.y.value)/2
+    
+    # Correct Mag 1 (cam_7 ROI2)
+    cam_7.roi2.min_xyz.min_y.value = cam_7.roi2.min_xyz.min_y.value + centerPinOffsYLoMag
+    # Correct Mag 2 (cam_7 ROI3)
+    cam_7.roi3.min_xyz.min_y.value = cam_7.roi2.min_xyz.min_y.value + (cam_7.roi2.size.y.value-cam_7.roi3.size.y.value)/2
+
+    # De-invert image
+    cam_7.proc1.scale.value = -1
+    cam_8.proc1.scale.value = -1
     
     # Set thresold to previous value
     cam_8.stats4.centroid_threshold.value = cam_8ThresholdOld
+    cam_7.stats4.centroid_threshold.value = cam_7ThresholdOld
+    
+    return
