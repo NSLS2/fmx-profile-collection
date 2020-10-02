@@ -117,8 +117,8 @@ def beam_center_align(transSet='All'):
     loMagCal = BL_calibration.LoMagCal.value
     
     # Read centroids
-    beamHiMagCentroidX = centroid_avg(cam_8)[0]
-    beamHiMagCentroidY = centroid_avg(cam_8)[1]
+    beamHiMagCentroidX = centroid_avg(cam_8.stats4)[0]
+    beamHiMagCentroidY = centroid_avg(cam_8.stats4)[1]
 
     # Get beam shift on Hi Mag
     # Assume the LSDC centering crosshair is in the center of the FOV

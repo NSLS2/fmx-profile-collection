@@ -559,7 +559,7 @@ def setE(energy,
         time.sleep(1)
     
     # Check for pre-conditions for dcm_rock() and ivu_gap_scan()
-    if shutter_foe_position_status_get():
+    if shutter_foe.status.get():
         print('FOE shutter closed. Has to be open for this to work. Exiting')
         return -1
         
@@ -581,7 +581,7 @@ def setE(energy,
     
     if beamCenterAlign:
         # Check for pre-conditions for beam_center_align()
-        if shutter_eshutch_position_status_get():
+        if shutter_hutch_c.status.get():
             print('Experiment hutch shutter closed. Has to be open for this to work. Exiting')
             return -1
         if not govStatusGet('SA'):

@@ -73,59 +73,7 @@ def get_energy():
     return hdcm.e.user_readback.get()
 
 
-# Shutter functions
-
-def shutter_eshutch_position_status_get():
-    """
-    Returns the status of the hutch shutter
-    
-    status: 0 (Open), 1 (Closed), 2 (Undefined)
-    """
-    blStr = blStrGet()
-    if blStr == -1: return -1
-    
-    sysStr = 'XF:17IDA-PPS:' + blStr
-    devStr = '{PSh}'
-    cmdStr = 'Pos-Sts'
-    pvStr = sysStr + devStr + cmdStr
-    status = epics.caget(pvStr)
-    
-    return status
-
-def shutter_foe_position_status_get():
-    """
-    Returns the status of the FOE shutter
-    
-    status: 0 (Open), 1 (Closed), 2 (Undefined)
-    """
-    sysStr = 'XF:17ID-PPS:' + 'FAMX'
-    devStr = '{Sh:FE}'
-    cmdStr = 'Pos-Sts'
-    pvStr = sysStr + devStr + cmdStr
-    status = epics.caget(pvStr)
-    
-    return status
-
-
 # Beam align functions
-
-def detectorCoverPositionStatusGet():
-    """
-    Returns the status of the Detector Cover
-    
-    status: 0 (Not Open), 1 (Open) 
-    """
-    blStr = blStrGet()
-    if blStr == -1: return -1
-    
-    sysStr = 'XF:17IDC-ES:' + blStr
-    devStr = '{Det:' + blStr + '-Cover}'
-    cmdStr = 'Pos-Sts'
-    pvStr = sysStr + devStr + cmdStr
-    status = epics.caget(pvStr)
-    
-    return status
-
 
 def detectorCoverClose():
     """
@@ -149,61 +97,6 @@ def detectorCoverOpen():
         #print(cover_detector.status.get())
         time.sleep(0.5)
     
-    return
-
-
-def shutterBCUPositionStatusGet():
-    """
-    Returns the status of the BCU Shutter
-    
-    status: 0 (Open), 1 (Closed), 2 (Undefined)
-    """
-    blStr = blStrGet()
-    if blStr == -1: return -1
-    
-    sysStr = 'XF:17IDC-ES:' + blStr
-    devStr = '{Gon:1-Sht}'
-    cmdStr = 'Pos-Sts'
-    pvStr = sysStr + devStr + cmdStr
-    status = epics.caget(pvStr)
-    
-    return status
-
-
-def shutterBCUClose():
-    """
-    Closes the BCU Shutter
-    """
-    blStr = blStrGet()
-    if blStr == -1: return -1
-    
-    sysStr = 'XF:17IDC-ES:' + blStr
-    devStr = '{Gon:1-Sht}'
-    cmdStr = 'Cmd:Cls-Cmd.PROC'
-    pvStr = sysStr + devStr + cmdStr
-    epics.caput(pvStr, 1)
-    
-    while shutterBCUPositionStatusGet() != 1:
-        time.sleep(1)
-        
-    return
-
-def shutterBCUOpen():
-    """
-    Opens the BCU Shutter
-    """
-    blStr = blStrGet()
-    if blStr == -1: return -1
-    
-    sysStr = 'XF:17IDC-ES:' + blStr
-    devStr = '{Gon:1-Sht}'
-    cmdStr = 'Cmd:Opn-Cmd.PROC'
-    pvStr = sysStr + devStr + cmdStr
-    epics.caput(pvStr, 1)
-    
-    while shutterBCUPositionStatusGet() != 0:
-        time.sleep(1)
-        
     return
 
 
@@ -263,49 +156,6 @@ def trans_get(trans = trans_bcu):
     return transmission
 
 
-def cameraCalSet(camStr, calVal):
-    """
-    Stores the calibration of a camera in an EPICS PV [um/px]
-    
-    camStr = 'LoMag' or 'HiMag'
-    calVal = Camera calibration in um/px. Assume X = Y
-    """
-    blStr = blStrGet()
-    if blStr == -1: return -1
-    
-    if camStr not in ['LoMag', 'HiMag']:
-        print('stateStr must be one of: LoMag, HiMag')
-        return -1
-    
-    sysStr = 'XF:17ID-ES:' + blStr
-    devStr = '{Misc-' + camStr + 'Cal}'
-    pvStr = sysStr + devStr
-    camCal = epics.caput(pvStr, calVal)
-    
-    return
-
-
-def cameraCalGet(camStr):
-    """
-    Returns the calibration of a camera [um/px]
-    
-    camStr = 'LoMag' or 'HiMag'
-    """
-    blStr = blStrGet()
-    if blStr == -1: return -1
-    
-    if camStr not in ['LoMag', 'HiMag']:
-        print('stateStr must be one of: LoMag, HiMag')
-        return -1
-    
-    sysStr = 'XF:17ID-ES:' + blStr
-    devStr = '{Misc-' + camStr + 'Cal}'
-    pvStr = sysStr + devStr
-    camCal = epics.caget(pvStr)
-    
-    return camCal
-
-
 def get_fluxKeithley():
     """
     Returns Keithley diode current derived flux.
@@ -324,24 +174,6 @@ def set_fluxBeam(flux):
     """
     
     error = epics.caput('XF:17IDA-OP:FMX{Mono:DCM-dflux-M}', flux)
-    
-    return error
-
-
-def set_crl(crlSlider,inOut):
-    '''
-    Set EPICS PVs to move CRLs in or out
-    
-    crlSlider: Example for FMX slider No4: CRL_V2A='XF:17IDC-OP:FMX{CRL:04}Cmd:'
-    inOut: 0 for slider OUT, 1 for IN
-    '''
-    
-    # TODO: Consider using try/exceptions?
-    
-    if inOut:
-        error = epics.caput(crlSlider+'In-Cmd',1)
-    else:
-        error = epics.caput(crlSlider+'Out-Cmd',1)
     
     return error
 
