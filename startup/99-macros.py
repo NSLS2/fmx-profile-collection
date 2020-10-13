@@ -1,7 +1,6 @@
 import epics
 import numpy as np
 import time
-import socket
 
 #import bluesky.preprocessors as bpp
 #import bluesky.plans as bp
@@ -44,116 +43,6 @@ def help_fmx():
     """)
     
     return
-
-
-def blStrGet():
-    """
-    Return beamline string
-    
-    blStr: 'AMX' or 'FMX'
-    
-    Beamline is determined by querying hostname
-    """
-    hostStr = socket.gethostname()
-    if hostStr == 'xf17id1-ca1':
-        blStr = 'FMX'
-    elif hostStr == 'xf17id2-ca1':
-        blStr = 'AMX'
-    else: 
-        print('Error - this code must be executed on one of the -ca1 machines')
-        blStr = -1
-        
-    return blStr
-
-
-def get_energy():
-    """
-    Returns the current photon energy in eV derived from the DCM Bragg angle
-    """ 
-    return hdcm.e.user_readback.get()
-
-
-# Beam align functions
-
-def detectorCoverClose():
-    """
-    Closes the Detector Cover
-    """
-    yield from bps.mv(cover_detector.close, 1)
-    
-    while cover_detector.status.get() == 1:
-        #print(cover_detector.status.get())
-        time.sleep(0.5)
-    
-    return
-
-def detectorCoverOpen():
-    """
-    Opens the Detector Cover
-    """
-    yield from bps.mv(cover_detector.open, 1)
-    
-    while cover_detector.status.get() != 1:
-        #print(cover_detector.status.get())
-        time.sleep(0.5)
-    
-    return
-
-
-def transDefaultGet(energy):
-    """
-    Returns the default transmission to avoid saturation of the scintillator
-    
-    energy: X-ray energy [eV]
-    
-    The look up table is set in settings/set_energy setup FMX.ipynb
-    """
-    
-    # This reads from:
-    # XF:17ID-ES:FMX{Misc-LUT:atten}X-Wfm
-    # XF:17ID-ES:FMX{Misc-LUT:atten}Y-Wfm
-    # 
-    # atten is a dummy motor just for this purpose.
-    # To be replaced by trans_bcu and corresponding new PVs
-    
-    transLUT = read_lut('atten')
-    transDefault = np.interp(energy,transLUT['Energy'],transLUT['Position'])
-    
-    return transDefault
-
-
-# TODO: This is a plan. not macro - sort somewhere else?
-def trans_set(transmission, trans = trans_bcu):
-    """
-    Sets the Attenuator transmission
-    """
-    
-    e_dcm = get_energy()
-    if e_dcm < 5000 or e_dcm > 30000:
-        print('Monochromator energy out of range. Must be within 5000 - 30000 eV. Exiting.')
-        return
-    
-    yield from bps.mv(trans.energy, e_dcm) # This energy PV is only used for debugging
-    yield from bps.mv(trans.transmission, transmission)
-    yield from bps.mv(trans.set_trans, 1)
-    
-    if trans == trans_bcu:
-        while atten_bcu.done != 1:
-            time.sleep(0.5)
-    
-    print('Attenuator = ' + trans.name + ', Transmission set to %.3f' % trans.transmission.value)
-    return
-
-
-def trans_get(trans = trans_bcu):
-    """
-    Returns the Attenuator transmission
-    """
-    
-    transmission = trans.transmission.get()
-    
-    print('Attenuator = ' + trans.name + ', Transmission = %.3f' % transmission)
-    return transmission
 
 
 def get_fluxKeithley():

@@ -34,6 +34,88 @@ def centroid_avg(stats):
     return CentroidX, CentroidY
 
 
+# Beam align functions
+
+def detectorCoverClose():
+    """
+    Closes the Detector Cover
+    """
+    yield from bps.mv(cover_detector.close, 1)
+    
+    while cover_detector.status.get() == 1:
+        #print(cover_detector.status.get())
+        time.sleep(0.5)
+    
+    return
+
+def detectorCoverOpen():
+    """
+    Opens the Detector Cover
+    """
+    yield from bps.mv(cover_detector.open, 1)
+    
+    while cover_detector.status.get() != 1:
+        #print(cover_detector.status.get())
+        time.sleep(0.5)
+    
+    return
+
+
+def trans_set(transmission, trans = trans_bcu):
+    """
+    Sets the Attenuator transmission
+    """
+    
+    e_dcm = get_energy()
+    if e_dcm < 5000 or e_dcm > 30000:
+        print('Monochromator energy out of range. Must be within 5000 - 30000 eV. Exiting.')
+        return
+    
+    yield from bps.mv(trans.energy, e_dcm) # This energy PV is only used for debugging
+    yield from bps.mv(trans.transmission, transmission)
+    yield from bps.mv(trans.set_trans, 1)
+    
+    if trans == trans_bcu:
+        while atten_bcu.done != 1:
+            time.sleep(0.5)
+    
+    print('Attenuator = ' + trans.name + ', Transmission set to %.3f' % trans.transmission.value)
+    return
+
+
+def trans_get(trans = trans_bcu):
+    """
+    Returns the Attenuator transmission
+    """
+    
+    transmission = trans.transmission.get()
+    
+    print('Attenuator = ' + trans.name + ', Transmission = %.3f' % transmission)
+    return transmission
+
+
+def transDefaultGet(energy):
+    """
+    Returns the default transmission to avoid saturation of the scintillator
+    
+    energy: X-ray energy [eV]
+    
+    The look up table is set in settings/set_energy setup FMX.ipynb
+    """
+    
+    # This reads from:
+    # XF:17ID-ES:FMX{Misc-LUT:atten}X-Wfm
+    # XF:17ID-ES:FMX{Misc-LUT:atten}Y-Wfm
+    # 
+    # atten is a dummy motor just for this purpose.
+    # To be replaced by trans_bcu and corresponding new PVs
+    
+    transLUT = read_lut('atten')
+    transDefault = np.interp(energy,transLUT['Energy'],transLUT['Position'])
+    
+    return transDefault
+
+
 def beam_center_align(transSet='All'):
     """
     Corrects alignment of goniometer and LSDC center point after a beam drift
