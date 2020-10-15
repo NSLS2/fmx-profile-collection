@@ -2,6 +2,7 @@ from ophyd import Device, EpicsSignal, EpicsSignalRO, EpicsMotor
 from ophyd import Component as Cpt
 from ophyd.utils import set_and_wait
 
+beam_current = EpicsSignal('SR:OPS-BI{DCCT:1}I:Real-I')
 
 # Ugly, ugly hack (sorry)
 # Can't set the PV's precision, so I'll force it here

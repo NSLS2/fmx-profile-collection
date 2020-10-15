@@ -133,5 +133,5 @@ class Bimorph(Device):
 hfm_bimorph = Bimorph('XF:17IDA-OP:FMX{Mir:HFM-PS}', name='hfm_bimorph')
 kb_bimorph = Bimorph('XF:17IDC-OP:FMX{Mir:KB-PS}', name='kb_bimorph')
 
-
-
+vkb_piezo_tweak = EpicsSignal('XF:17IDC-BI:FMX{Best:2}:PreDAC0:OutCh1')
+hkb_piezo_tweak = EpicsSignal('XF:17IDC-BI:FMX{Best:2}:PreDAC0:OutCh2')

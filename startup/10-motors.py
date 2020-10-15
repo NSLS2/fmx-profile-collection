@@ -24,6 +24,10 @@ class XYZfMotor(Device):
 	z = Cpt(EpicsMotor, '-Ax:Zf}Mtr')
 
 
+class YMotor(Device):
+	y = Cpt(EpicsMotor, '-Ax:Y}Mtr')
+
+
 class Slits(Device):
 	b = Cpt(EpicsMotor, '-Ax:B}Mtr')
 	i = Cpt(EpicsMotor, '-Ax:I}Mtr')
@@ -94,11 +98,16 @@ class BeamStop(Device):
 	fx = Cpt(EpicsMotor, '-Ax:FX}Mtr')
 	fy = Cpt(EpicsMotor, '-Ax:FY}Mtr')
     
-class Attenuator(Device):
-	a1 = Cpt(EpicsMotor, '-Ax:1}Mtr')
-	a2 = Cpt(EpicsMotor, '-Ax:2}Mtr')
-	a3 = Cpt(EpicsMotor, '-Ax:3}Mtr')
-	a4 = Cpt(EpicsMotor, '-Ax:4}Mtr')
+class Cover(Device):
+    close = Cpt(EpicsSignal, 'Cmd:Cls-Cmd')
+    open = Cpt(EpicsSignal, 'Cmd:Opn-Cmd')
+    status = Cpt(EpicsSignalRO, 'Pos-Sts') # status: 0 (Not Open), 1 (Open)
+
+class Shutter(Device):
+    close = Cpt(EpicsSignal, 'Cmd:Cls-Cmd.PROC')
+    open = Cpt(EpicsSignal, 'Cmd:Opn-Cmd.PROC')
+    status = Cpt(EpicsSignalRO, 'Pos-Sts') # status: 0 (Open), 1 (Closed), 2 (Undefined)
+    
 
 #######################################################
 ### FMX
@@ -129,6 +138,7 @@ kbm = KBMirror('XF:17IDC-OP:FMX{Mir', name='kbm')
 
 ## Microscope
 mic = XYMotor('XF:17IDC-ES:FMX{Mic:1', name='mic')
+light = YMotor('XF:17IDC-ES:FMX{Light:1', name='lightY')
 
 ## Goniometer Stack
 gonio = GoniometerStack('XF:17IDC-ES:FMX{Gon:1', name='gonio')
@@ -148,8 +158,23 @@ bs = BeamStop('XF:17IDC-ES:FMX{BS:1', name='bs')
 ## Collimator
 colli = XZXYMotor('XF:17IDC-ES:FMX{Colli:1', name='colli')
 
-## BCU Attenuator
-atten = Attenuator('XF:17IDC-OP:FMX{Attn:BCU', name='atten')
-
 ## PI Scanner Fine Stages
 pif = XYZfMotor('XF:17IDC-ES:FMX{Gon:1', name='pif')
+
+## Eiger16M detector cover
+cover_detector = Cover('XF:17IDC-ES:FMX{Det:FMX-Cover}', name='cover_detector',
+                 read_attrs=['status'])
+
+## 17-ID-A FOE shutter
+shutter_foe = Shutter('XF:17ID-PPS:FAMX{Sh:FE}', name='shutter_foe',
+                 read_attrs=['status'])
+
+## 17-ID-C experimental hutch shutter
+shutter_hutch_c = Shutter('XF:17IDA-PPS:FMX{PSh}', name='shutter_hutch_c',
+                 read_attrs=['status'])
+
+## FMX BCU shutter
+shutter_bcu = Shutter('XF:17IDC-ES:FMX{Gon:1-Sht}', name='shutter_bcu',
+                 read_attrs=['status'])
+
+
