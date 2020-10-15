@@ -1,5 +1,7 @@
 # Plans to set beamline energy
 
+# TODO: rework it to use ophyd devices/components instead of epics.caget(...).
+
 import bluesky.preprocessors as bpp
 import bluesky.plans as bp
 import bluesky.plan_stubs as bps
@@ -223,12 +225,12 @@ def dcm_rock(dcm_p_range=0.03, dcm_p_points=51, logging=True, altDetector=False)
     # (FMX specific)
     if logging:
         print('Energy = {:.1f} eV'.format(energy))       
-        print('HDCM cr2 pitch = {:.3f} mrad'.format(rock_mot.user_readback.value))
+        print('HDCM cr2 pitch = {:.3f} mrad'.format(rock_mot.user_readback.get()))
         if rock_det == bpm1:
-            print('BPM1 sum = {:.4g} A'.format(bpm1.sum_all.value))
+            print('BPM1 sum = {:.4g} A'.format(bpm1.sum_all.get()))
         elif  rock_det == keithley:
             time.sleep(2.0)  # Range switching is slow
-            print('Keithley current = {:.4g} A'.format(keithley.value))
+            print('Keithley current = {:.4g} A'.format(keithley.get()))
         
     plt.close()
         
@@ -286,11 +288,11 @@ def ivu_gap_scan(start, end, steps, detector=bpm1, goToPeak=True):
         # Prevent going below the lower limit or above the high limit
         if motor is ivu_gap:
             step_size = (stop - start) / (num - 1)
-            while motor.gap.user_setpoint.value + start < motor.gap.low_limit:
+            while motor.gap.user_setpoint.get() + start < motor.gap.low_limit:
                 start += 5*step_size
                 stop += 5*step_size
 
-            while motor.gap.user_setpoint.value + stop > motor.gap.high_limit:
+            while motor.gap.user_setpoint.get() + stop > motor.gap.high_limit:
                 start -= 5*step_size
                 stop -= 5*step_size
 
@@ -302,7 +304,7 @@ def ivu_gap_scan(start, end, steps, detector=bpm1, goToPeak=True):
         return inner()
     
     # Remember pre-scan value
-    gapPreStart=motor.gap.user_readback.value
+    gapPreStart=motor.gap.user_readback.get()
     
     # Move to start
     yield from bps.mv(motor, start)
@@ -374,8 +376,8 @@ def setE(energy,
     """
     
     # Store initial Slit 1 gap positions
-    slits1XGapOrg = slits1.x_gap.user_readback.value
-    slits1YGapOrg = slits1.y_gap.user_readback.value
+    slits1XGapOrg = slits1.x_gap.user_readback.get()
+    slits1YGapOrg = slits1.y_gap.user_readback.get()
     
     print('Setting FMX motor positions')
     try:
@@ -397,8 +399,8 @@ def setE(energy,
     time.sleep(1)
         
     print('Scanning undulator gap')
-    start = ivu_gap.gap.user_readback.value - ivuGapStartOff
-    end = ivu_gap.gap.user_readback.value + ivuGapEndOff
+    start = ivu_gap.gap.user_readback.get() - ivuGapStartOff
+    end = ivu_gap.gap.user_readback.get() + ivuGapEndOff
     try:
         yield from ivu_gap_scan(start, end, ivuGapSteps, goToPeak=True)
     except:

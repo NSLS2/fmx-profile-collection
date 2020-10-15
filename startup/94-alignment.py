@@ -22,8 +22,8 @@ def centroid_avg(stats):
     centroidXArr = np.zeros(10)
     centroidYArr = np.zeros(10)
     for i in range(0, 10):
-        centroidXArr[i] = stats.centroid.x.value
-        centroidYArr[i] = stats.centroid.y.value
+        centroidXArr[i] = stats.centroid.x.get()
+        centroidYArr[i] = stats.centroid.y.get()
         # print('Centroid X = {:.6g} px'.format(centroidXArr[i]), ', Centroid Y = {:.6g} px'.format(centroidYArr[i]))
         time.sleep(0.2)
     CentroidX = centroidXArr.mean()
@@ -79,7 +79,7 @@ def trans_set(transmission, trans = trans_bcu):
         while atten_bcu.done != 1:
             time.sleep(0.5)
     
-    print('Attenuator = ' + trans.name + ', Transmission set to %.3f' % trans.transmission.value)
+    print('Attenuator = ' + trans.name + ', Transmission set to %.3f' % trans.transmission.get())
     return
 
 
@@ -184,19 +184,21 @@ def beam_center_align(transSet='All'):
     yield from bps.mv(light.y,govPositionGet('li', 'Out'))
     print('Light Y Out')
     
+    # TODO: use "yield from bps.mv(...)" instead of .put(...) below.
+
     # ROI1 centroid plugin does not work
     # Copy ROI1 geometry to ROI4 and use ROI4 centroid plugin
-    cam_8.roi4.min_xyz.min_x.value = cam_8.roi1.min_xyz.min_x.value
-    cam_8.roi4.min_xyz.min_y.value = cam_8.roi1.min_xyz.min_y.value
-    cam_8.roi4.size.x.value = cam_8.roi1.size.x.value
-    cam_8.roi4.size.y.value = cam_8.roi1.size.y.value
+    cam_8.roi4.min_xyz.min_x.put(cam_8.roi1.min_xyz.min_x.get())
+    cam_8.roi4.min_xyz.min_y.put(cam_8.roi1.min_xyz.min_y.get())
+    cam_8.roi4.size.x.put(cam_8.roi1.size.x.get())
+    cam_8.roi4.size.y.put(cam_8.roi1.size.y.get())
     
     yield from bps.mv(shutter_bcu.open, 1)
     print('BCU Shutter Open')
     
     # Camera calibration [um/px]
-    hiMagCal = BL_calibration.HiMagCal.value
-    loMagCal = BL_calibration.LoMagCal.value
+    hiMagCal = BL_calibration.HiMagCal.get()
+    loMagCal = BL_calibration.LoMagCal.get()
     
     # Read centroids
     beamHiMagCentroidX = centroid_avg(cam_8.stats4)[0]
@@ -205,30 +207,30 @@ def beam_center_align(transSet='All'):
     # Get beam shift on Hi Mag
     # Assume the LSDC centering crosshair is in the center of the FOV
     # This works as long as cam_8 ROI1 does not hit the edge of the cam_8 image
-    beamHiMagDiffX = beamHiMagCentroidX - (cam_8.roi4.size.x.value/2)
-    beamHiMagDiffY = beamHiMagCentroidY - (cam_8.roi4.size.y.value/2)
+    beamHiMagDiffX = beamHiMagCentroidX - (cam_8.roi4.size.x.get()/2)
+    beamHiMagDiffY = beamHiMagCentroidY - (cam_8.roi4.size.y.get()/2)
     
     # Correct Mag 4 (cam_8 ROI1)
     # Adjust cam_8 ROI1 min_y, LSDC uses this for the Mag4 FOV.
     # This works as long as cam_8 ROI1 does not hit the edge of the cam_8 image
-    cam_8.roi1.min_xyz.min_x.value = cam_8.roi1.min_xyz.min_x.value + beamHiMagDiffX
-    cam_8.roi1.min_xyz.min_y.value = cam_8.roi1.min_xyz.min_y.value + beamHiMagDiffY
+    cam_8.roi1.min_xyz.min_x.put(cam_8.roi1.min_xyz.min_x.get() + beamHiMagDiffX)
+    cam_8.roi1.min_xyz.min_y.put(cam_8.roi1.min_xyz.min_y.get() + beamHiMagDiffY)
     
     # Correct Mag 3 (cam_8 ROI2)
-    cam_8.roi2.min_xyz.min_x.value = cam_8.roi2.min_xyz.min_x.value + beamHiMagDiffX
-    cam_8.roi2.min_xyz.min_y.value = cam_8.roi2.min_xyz.min_y.value + beamHiMagDiffY
+    cam_8.roi2.min_xyz.min_x.put(cam_8.roi2.min_xyz.min_x.get() + beamHiMagDiffX)
+    cam_8.roi2.min_xyz.min_y.put(cam_8.roi2.min_xyz.min_y.get() + beamHiMagDiffY)
     
     # Get beam shift on Lo Mag from Hi Mag shift and calibration factor ratio
     beamLoMagDiffX = beamHiMagDiffX * hiMagCal/loMagCal
     beamLoMagDiffY = beamHiMagDiffY * hiMagCal/loMagCal
     
     # Correct Mag 1 (cam_7 ROI2)
-    cam_7.roi2.min_xyz.min_x.value = cam_7.roi2.min_xyz.min_x.value + beamLoMagDiffX
-    cam_7.roi2.min_xyz.min_y.value = cam_7.roi2.min_xyz.min_y.value + beamLoMagDiffY
+    cam_7.roi2.min_xyz.min_x.put(cam_7.roi2.min_xyz.min_x.get() + beamLoMagDiffX)
+    cam_7.roi2.min_xyz.min_y.put(cam_7.roi2.min_xyz.min_y.get() + beamLoMagDiffY)
     
     # Correct Mag 2 (cam_7 ROI3)
-    cam_7.roi3.min_xyz.min_x.value = cam_7.roi3.min_xyz.min_x.value + beamLoMagDiffX
-    cam_7.roi3.min_xyz.min_y.value = cam_7.roi3.min_xyz.min_y.value + beamLoMagDiffY
+    cam_7.roi3.min_xyz.min_x.put(cam_7.roi3.min_xyz.min_x.get() + beamLoMagDiffX)
+    cam_7.roi3.min_xyz.min_y.put(cam_7.roi3.min_xyz.min_y.get() + beamLoMagDiffY)
     
     yield from bps.mv(shutter_bcu.close, 1)
     print('BCU Shutter Closed')
@@ -278,18 +280,18 @@ def center_pin(cam=cam_8):
         return -1
     
     # Copy ROI2 geometry (HiMag Mag3 and LoMag Mag1) to ROI4 and use ROI4 centroid plugin
-    cam.roi4.min_xyz.min_x.value = cam.roi2.min_xyz.min_x.value
-    cam.roi4.min_xyz.min_y.value = cam.roi2.min_xyz.min_y.value
-    cam.roi4.size.x.value = cam.roi2.size.x.value * 0.25
-    cam.roi4.size.y.value = cam.roi2.size.y.value
-    cam.roi4.min_xyz.min_x.value = cam.roi2.min_xyz.min_x.value + cam.roi2.size.x.value/2 - cam.roi4.size.x.value/2
+    cam.roi4.min_xyz.min_x.put(cam.roi2.min_xyz.min_x.get())
+    cam.roi4.min_xyz.min_y.put(cam.roi2.min_xyz.min_y.get())
+    cam.roi4.size.x.put(cam.roi2.size.x.get() * 0.25)
+    cam.roi4.size.y.put(cam.roi2.size.y.get())
+    cam.roi4.min_xyz.min_x.put(cam.roi2.min_xyz.min_x.get() + cam.roi2.size.x.get()/2 - cam.roi4.size.x.get()/2)
     
     # Invert camera image, so dark pin on light image becomes a peak
-    cam.proc1.scale.value = -1
+    cam.proc1.scale.put(-1)
     
     # High threshold, so AD centroid doesn't interpret background
-    camThresholdOld = cam.stats4.centroid_threshold.value
-    cam.stats4.centroid_threshold.value = 150
+    camThresholdOld = cam.stats4.centroid_threshold.get()
+    cam.stats4.centroid_threshold.put(150)
     
     # Get centroids at Omega = 0, 90, 180, 270 deg
     yield from bps.mv(gonio.o,0)
@@ -321,10 +323,10 @@ def center_pin(cam=cam_8):
     yield from bps.mvr(gonio.pz,offsZ)
     
     # De-invert image
-    cam.proc1.scale.value = 1
+    cam.proc1.scale.put(1)
     
     # Set thresold to previous value
-    cam.stats4.centroid_threshold.value = camThresholdOld
+    cam.stats4.centroid_threshold.put(camThresholdOld)
     
     
 def gonio_axis_align():
@@ -341,30 +343,30 @@ def gonio_axis_align():
     """
     
     # Invert camera image, so dark pin on light image becomes a peak
-    cam_7.proc1.scale.value = -1
-    cam_8.proc1.scale.value = -1
+    cam_7.proc1.scale.put(-1)
+    cam_8.proc1.scale.put(-1)
     
     # High threshold, so AD centroid doesn't interpret background
-    cam_8ThresholdOld = cam_8.stats4.centroid_threshold.value
-    cam_8.stats4.centroid_threshold.value = 150
-    cam_7ThresholdOld = cam_7.stats4.centroid_threshold.value
-    cam_7.stats4.centroid_threshold.value = 150
+    cam_8ThresholdOld = cam_8.stats4.centroid_threshold.get()
+    cam_8.stats4.centroid_threshold.put(150)
+    cam_7ThresholdOld = cam_7.stats4.centroid_threshold.get()
+    cam_7.stats4.centroid_threshold.put(150)
     
     # HiMag
     # Copy ROI2 geometry (HiMag Mag3) to ROI4 and use ROI4 centroid plugin
-    cam_8.roi4.min_xyz.min_x.value = cam_8.roi2.min_xyz.min_x.value
-    cam_8.roi4.min_xyz.min_y.value = cam_8.roi2.min_xyz.min_y.value
-    cam_8.roi4.size.x.value = cam_8.roi2.size.x.value * 0.20
-    cam_8.roi4.size.y.value = cam_8.roi2.size.y.value
-    cam_8.roi4.min_xyz.min_x.value = cam_8.roi2.min_xyz.min_x.value + cam_8.roi2.size.x.value/2 - cam_8.roi4.size.x.value/2
+    cam_8.roi4.min_xyz.min_x.put(cam_8.roi2.min_xyz.min_x.get())
+    cam_8.roi4.min_xyz.min_y.put(cam_8.roi2.min_xyz.min_y.get())
+    cam_8.roi4.size.x.put(cam_8.roi2.size.x.get() * 0.20)
+    cam_8.roi4.size.y.put(cam_8.roi2.size.y.get())
+    cam_8.roi4.min_xyz.min_x.put(cam_8.roi2.min_xyz.min_x.get() + cam_8.roi2.size.x.get()/2 - cam_8.roi4.size.x.get()/2)
     
     # LoMag
     # Copy ROI2 geometry (LoMag Mag1) to ROI4 and use ROI4 centroid plugin
-    cam_7.roi4.min_xyz.min_x.value = cam_7.roi2.min_xyz.min_x.value
-    cam_7.roi4.min_xyz.min_y.value = cam_7.roi2.min_xyz.min_y.value
-    cam_7.roi4.size.x.value = cam_7.roi2.size.x.value * 0.05
-    cam_7.roi4.size.y.value = cam_7.roi2.size.y.value
-    cam_7.roi4.min_xyz.min_x.value = cam_7.roi2.min_xyz.min_x.value + cam_7.roi2.size.x.value/2 - cam_7.roi4.size.x.value/2
+    cam_7.roi4.min_xyz.min_x.put(cam_7.roi2.min_xyz.min_x.get())
+    cam_7.roi4.min_xyz.min_y.put(cam_7.roi2.min_xyz.min_y.get())
+    cam_7.roi4.size.x.put(cam_7.roi2.size.x.get() * 0.05)
+    cam_7.roi4.size.y.put(cam_7.roi2.size.y.get())
+    cam_7.roi4.min_xyz.min_x.put(cam_7.roi2.min_xyz.min_x.get() + cam_7.roi2.size.x.get()/2 - cam_7.roi4.size.x.get()/2)
     
     centerPinYHiMag0 = centroid_avg(cam_8.stats4)[1]
     centerPinYLoMag0 = centroid_avg(cam_7.stats4)[1]
@@ -375,25 +377,25 @@ def gonio_axis_align():
     centerPinYHiMag = (centerPinYHiMag0 + centerPinYHiMag180)/2
     centerPinYLoMag = (centerPinYLoMag0 + centerPinYLoMag180)/2
 
-    centerPinOffsYHiMag = centerPinYHiMag - cam_8.roi4.size.y.value / 2
-    centerPinOffsYLoMag = centerPinYLoMag - cam_7.roi4.size.y.value / 2
+    centerPinOffsYHiMag = centerPinYHiMag - cam_8.roi4.size.y.get() / 2
+    centerPinOffsYLoMag = centerPinYLoMag - cam_7.roi4.size.y.get() / 2
     
     # Correct Mag 3 (cam_8 ROI2)
-    cam_8.roi2.min_xyz.min_y.value = cam_8.roi2.min_xyz.min_y.value + centerPinOffsYHiMag
+    cam_8.roi2.min_xyz.min_y.put(cam_8.roi2.min_xyz.min_y.get() + centerPinOffsYHiMag)
     # Correct Mag 4 (cam_8 ROI1)
-    cam_8.roi1.min_xyz.min_y.value = cam_8.roi2.min_xyz.min_y.value + (cam_8.roi2.size.y.value-cam_8.roi1.size.y.value)/2
+    cam_8.roi1.min_xyz.min_y.put(cam_8.roi2.min_xyz.min_y.get() + (cam_8.roi2.size.y.get()-cam_8.roi1.size.y.get())/2)
     
     # Correct Mag 1 (cam_7 ROI2)
-    cam_7.roi2.min_xyz.min_y.value = cam_7.roi2.min_xyz.min_y.value + centerPinOffsYLoMag
+    cam_7.roi2.min_xyz.min_y.put(cam_7.roi2.min_xyz.min_y.get() + centerPinOffsYLoMag)
     # Correct Mag 2 (cam_7 ROI3)
-    cam_7.roi3.min_xyz.min_y.value = cam_7.roi2.min_xyz.min_y.value + (cam_7.roi2.size.y.value-cam_7.roi3.size.y.value)/2
+    cam_7.roi3.min_xyz.min_y.put(cam_7.roi2.min_xyz.min_y.get() + (cam_7.roi2.size.y.get()-cam_7.roi3.size.y.get())/2)
 
     # De-invert image
-    cam_7.proc1.scale.value = -1
-    cam_8.proc1.scale.value = -1
+    cam_7.proc1.scale.put(-1)
+    cam_8.proc1.scale.put(-1)
     
     # Set thresold to previous value
-    cam_8.stats4.centroid_threshold.value = cam_8ThresholdOld
-    cam_7.stats4.centroid_threshold.value = cam_7ThresholdOld
+    cam_8.stats4.centroid_threshold.put(cam_8ThresholdOld)
+    cam_7.stats4.centroid_threshold.put(cam_7ThresholdOld)
     
     return

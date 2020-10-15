@@ -1,5 +1,7 @@
 # Governor functions
 
+# TODO: rework it to use ophyd devices/components instead of epics.caget(...).
+
 import epics
 import time
 

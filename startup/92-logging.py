@@ -48,10 +48,10 @@ def slit1_flux_reference(flux_df,slit1Gap):
     
     flux_df.at[slit1Gap, 'Slit 1 X gap [um]'] = slit1Gap
     flux_df.at[slit1Gap, 'Slit 1 Y gap [um]'] = slit1Gap
-    flux_df.at[slit1Gap, 'Keithley current [A]'] = keithley.value
+    flux_df.at[slit1Gap, 'Keithley current [A]'] = keithley.get()
     flux_df.at[slit1Gap, 'Keithley flux [ph/s]'] = get_fluxKeithley()
-    flux_df.at[slit1Gap, 'BPM1 sum [A]'] = bpm1.sum_all.value
-    # TEMP FIX: flux_df.at[slit1Gap, 'BPM4 sum [A]'] = bpm4.sum_all.value
+    flux_df.at[slit1Gap, 'BPM1 sum [A]'] = bpm1.sum_all.get()
+    # TEMP FIX: flux_df.at[slit1Gap, 'BPM4 sum [A]'] = bpm4.sum_all.get()
     flux_df.at[slit1Gap, 'BPM4 sum [A]'] = 0
     
 
@@ -118,7 +118,7 @@ def fmx_flux_reference(slit1GapList = [2000, 1000, 600, 400], slit1GapDefault = 
     log_fmx(msgStr)
     
     # TEMP FIX: # BPM4 in repair 
-    # TEMP FIX: msgStr = 'BPM4 sum = {:.4g} A for Slit 1 gap = {:.1f} um'.format(bpm4.sum_all.value, slit1GapDefault)
+    # TEMP FIX: msgStr = 'BPM4 sum = {:.4g} A for Slit 1 gap = {:.1f} um'.format(bpm4.sum_all.get(), slit1GapDefault)
     # TEMP FIX: print(msgStr)
     # TEMP FIX: log_fmx(msgStr)
     
@@ -141,59 +141,59 @@ def fmx_beamline_reference():
     print(msgStr)
     log_fmx(msgStr)
     
-    msgStr = "Beam current = " + "%.2f" % beam_current.value + " mA"
+    msgStr = "Beam current = " + "%.2f" % beam_current.get() + " mA"
     print(msgStr)
     log_fmx(msgStr)
     
-    msgStr = "IVU gap = " + "%.1f" % ivu_gap.gap.user_readback.value + " um"
+    msgStr = "IVU gap = " + "%.1f" % ivu_gap.gap.user_readback.get() + " um"
     print(msgStr)
     log_fmx(msgStr)
     
-    msgStr = "XBPM2 posX = " + "%.2f" % xbpm2.x.value + " um"
+    msgStr = "XBPM2 posX = " + "%.2f" % xbpm2.x.get() + " um"
     print(msgStr)
     log_fmx(msgStr)
     
-    msgStr = "XBPM2 posY = " + "%.2f" % xbpm2.y.value + " um"
+    msgStr = "XBPM2 posY = " + "%.2f" % xbpm2.y.get() + " um"
     print(msgStr)
     log_fmx(msgStr)
     
-    msgStr = "XBPM2 total current = " + "%.2f" % xbpm2.total.value + " uA"
+    msgStr = "XBPM2 total current = " + "%.2f" % xbpm2.total.get() + " uA"
     print(msgStr)
     log_fmx(msgStr)
     
-    msgStr = "HDCM pitch = " + "%.4f" % hdcm.p.user_readback.value + " mrad"
+    msgStr = "HDCM pitch = " + "%.4f" % hdcm.p.user_readback.get() + " mrad"
     print(msgStr)
     log_fmx(msgStr)
 
-    msgStr = "BPM1 posX = " + "%.2f" % bpm1.x.value
+    msgStr = "BPM1 posX = " + "%.2f" % bpm1.x.get()
     print(msgStr)
     log_fmx(msgStr)
     
-    msgStr = "BPM1 posY = " + "%.2f" % bpm1.y.value
+    msgStr = "BPM1 posY = " + "%.2f" % bpm1.y.get()
     print(msgStr)
     log_fmx(msgStr)
     
-    msgStr = "BPM1 total current = " + "%.3g" % bpm1.sum_all.value + " A"
+    msgStr = "BPM1 total current = " + "%.3g" % bpm1.sum_all.get() + " A"
     print(msgStr)
     log_fmx(msgStr)
     
-    msgStr = "VKB tweak voltage = " + "%.3f" % vkb_piezo_tweak.value + " V"
+    msgStr = "VKB tweak voltage = " + "%.3f" % vkb_piezo_tweak.get() + " V"
     print(msgStr)
     log_fmx(msgStr)
     
-    msgStr = "HKB tweak voltage = " + "%.3f" % hkb_piezo_tweak.value + " V"
+    msgStr = "HKB tweak voltage = " + "%.3f" % hkb_piezo_tweak.get() + " V"
     print(msgStr)
     log_fmx(msgStr)
     
-    msgStr = "Gonio X = " + "%.1f" % gonio.gx.user_readback.value + " um"
+    msgStr = "Gonio X = " + "%.1f" % gonio.gx.user_readback.get() + " um"
     print(msgStr)
     log_fmx(msgStr)
     
-    msgStr = "Gonio Y = " + "%.1f" % gonio.gy.user_readback.value + " um"
+    msgStr = "Gonio Y = " + "%.1f" % gonio.gy.user_readback.get() + " um"
     print(msgStr)
     log_fmx(msgStr)
     
-    msgStr = "Gonio Z = " + "%.1f" % gonio.gz.user_readback.value + " um"
+    msgStr = "Gonio Z = " + "%.1f" % gonio.gz.user_readback.get() + " um"
     print(msgStr)
     log_fmx(msgStr)
     
