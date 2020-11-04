@@ -232,7 +232,7 @@ def dcm_rock(dcm_p_range=0.03, dcm_p_points=51, logging=True, altDetector=False)
             time.sleep(2.0)  # Range switching is slow
             print('Keithley current = {:.4g} A'.format(keithley.get()))
         
-    plt.close()
+    #plt.close()
         
     
 def ivu_gap_scan(start, end, steps, detector=bpm1, goToPeak=True):
@@ -321,7 +321,7 @@ def ivu_gap_scan(start, end, steps, detector=bpm1, goToPeak=True):
         yield from bps.mv(ivu_gap, gapPreStart)
         print('Gap set to pre-scan value: %.1f' % gapPreStart + ' um')
     
-    plt.close()
+    #plt.close()
 
     
 def setE(energy,
