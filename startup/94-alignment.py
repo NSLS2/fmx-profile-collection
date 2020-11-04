@@ -76,7 +76,7 @@ def trans_set(transmission, trans = trans_bcu):
     yield from bps.mv(trans.set_trans, 1)
     
     if trans == trans_bcu:
-        while atten_bcu.done != 1:
+        while atten_bcu.done.get() != 1:
             time.sleep(0.5)
     
     print('Attenuator = ' + trans.name + ', Transmission set to %.3f' % trans.transmission.get())
