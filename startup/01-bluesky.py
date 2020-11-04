@@ -79,7 +79,8 @@ import nslsii
 
 BEAMLINE_ID = 'fmx'
 
-nslsii.configure_base(get_ipython().user_ns, BEAMLINE_ID)
+# nslsii.configure_base(get_ipython().user_ns, BEAMLINE_ID)
+nslsii.configure_base(get_ipython().user_ns, BEAMLINE_ID, pbar=False) # Progress bar for scans
 
 
 from pathlib import Path
