@@ -81,8 +81,10 @@ atten_bcu = AttenuatorBCU('XF:17IDC-OP:FMX{Attn:BCU', name='atten_bcu',
 
 ## RI Attenuator
 atten_ri = AttenuatorRI('XF:17IDC-OP:FMX{Attn:', name='atten_ri',
-                          read_attrs=[])
+                        read_attrs=[],
+                        labels=['fmx'])
 
 ## RI Transfocator
 transfocator = Transfocator('XF:17IDC-OP:FMX{CRL:', name='transfocator',
-                          read_attrs=[])
+                            read_attrs=[],
+                            labels=['fmx'])
