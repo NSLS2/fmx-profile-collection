@@ -201,8 +201,11 @@ def beam_center_align(transSet='All'):
     loMagCal = BL_calibration.LoMagCal.get()
     
     # Read centroids
-    beamHiMagCentroidX = centroid_avg(cam_8.stats4)[0]
-    beamHiMagCentroidY = centroid_avg(cam_8.stats4)[1]
+    time.sleep(1)
+    beamHiMagCentroid = centroid_avg(cam_8.stats4)
+    beamHiMagCentroidX = beamHiMagCentroid[0]
+    beamHiMagCentroidY = beamHiMagCentroid[1]
+    time.sleep(1)
 
     # Get beam shift on Hi Mag
     # Assume the LSDC centering crosshair is in the center of the FOV
@@ -231,6 +234,8 @@ def beam_center_align(transSet='All'):
     # Correct Mag 2 (cam_7 ROI3)
     cam_7.roi3.min_xyz.min_x.put(cam_7.roi3.min_xyz.min_x.get() + beamLoMagDiffX)
     cam_7.roi3.min_xyz.min_y.put(cam_7.roi3.min_xyz.min_y.get() + beamLoMagDiffY)
+    
+    time.sleep(3)
     
     yield from bps.mv(shutter_bcu.close, 1)
     print('BCU Shutter Closed')
@@ -309,6 +314,12 @@ def center_pin(cam=cam_8):
     yield from bps.mv(gonio.o,270)
     time.sleep(2)
     c270 = centroid_avg(cam.stats4)[1]
+    
+    # Camera calibration [um/px]
+    if cam==cam_8:
+        camCal = BL_calibration.HiMagCal.get()
+    elif cam==cam_7:
+        camCal = BL_calibration.LoMagCal.get()
     
     # Center offset Y
     offsY = ((c180 - c0))/2 * camCal

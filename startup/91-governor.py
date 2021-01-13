@@ -31,17 +31,19 @@ def govStatusGet(stateStr, configStr = 'Robot'):
     """
     Returns the current active status for a Governor state
     
-    stateStr: Governor short version state. Example: 'SA' for sample alignment
     configStr: Governor configuration, 'Robot' or 'Human', default: 'Robot'
+    stateStr: Governor short version state. Example: 'SA' for sample alignment
+              one of ['M', 'SE', 'SA', 'DA', 'XF', 'BL', 'BS', 'AB', 'CB', 'DI']
 
-    Example: govStatusGet('SA')
-    Example: govStatusGet('SA', configStr = 'Human')
+    Examples
+    govStatusGet('SA')
+    govStatusGet('SA', configStr = 'Human')
     """
     blStr = blStrGet()
     if blStr == -1: return -1
     
-    if stateStr not in ['M', 'SE', 'SA', 'DA', 'XF', 'BL', 'BS', 'AB']:
-        print('stateStr must be one of: M, SE, SA, DA, XF, BL, BS, AB]')
+    if stateStr not in ['M', 'SE', 'SA', 'DA', 'XF', 'BL', 'BS', 'AB', 'CB', 'DI']:
+        print('stateStr must be one of: M, SE, SA, DA, XF, BL, BS, AB, CB, DI]')
         return -1
     
     sysStr = 'XF:17IDC-ES:' + blStr
@@ -52,13 +54,13 @@ def govStatusGet(stateStr, configStr = 'Robot'):
     
     return govStatus
 
-
 def govStateSet(stateStr, configStr = 'Robot'):
     """
     Sets Governor state
 
     configStr: Governor configuration, 'Robot' or 'Human', default: 'Robot'
-    stateStr: one of ['M', 'SE', 'SA', 'DA', 'XF', 'BL', 'BS', 'AB']
+    stateStr: Governor short version state. Example: 'SA' for sample alignment
+              one of ['M', 'SE', 'SA', 'DA', 'XF', 'BL', 'BS', 'AB', 'CB', 'DI']
 
     Examples:
     govStateSet('SA')
@@ -67,8 +69,8 @@ def govStateSet(stateStr, configStr = 'Robot'):
     blStr = blStrGet()
     if blStr == -1: return -1
 
-    if stateStr not in ['M', 'SE', 'SA', 'DA', 'XF', 'BL', 'BS', 'AB']:
-        print('stateStr must be one of: M, SE, SA, DA, XF, BL, BS, AB]')
+    if stateStr not in ['M', 'SE', 'SA', 'DA', 'XF', 'BL', 'BS', 'AB', 'CB', 'DI']:
+        print('stateStr must be one of: M, SE, SA, DA, XF, BL, BS, AB, CB, DI]')
         return -1
     
     sysStr = 'XF:17IDC-ES:' + blStr
