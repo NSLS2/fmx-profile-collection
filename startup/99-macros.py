@@ -67,6 +67,39 @@ def set_fluxBeam(flux):
     return error
 
 
+def anneal(t=1.0):
+    """
+    Transitions Governor from SA to CB state and inserts annealer
+    
+    Requirements
+    ------------
+    * Governor in SA state
+    
+    Parameters
+    ----------
+    t: Time to insert annealer paddle. default = 1.0 [s]
+              
+    Examples
+    --------
+    anneal()
+    anneal(t=5)
+    
+    """
+    if not govStatusGet('SA'):
+        print('Not in Governor state SA, exiting')
+        return -1
+    
+    govStateSet('CB')
+    
+    annealer.air.put(1)
+    time.sleep(t)
+    annealer.air.put(0)
+    
+    govStateSet('SA')
+    
+    return
+
+
 def set_beamsize(sizeV, sizeH):
     """
     Sets Compound Refractive Lenses (CRL) to defocus the beam
