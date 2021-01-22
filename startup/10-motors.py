@@ -109,9 +109,9 @@ class Shutter(Device):
     status = Cpt(EpicsSignalRO, 'Pos-Sts') # status: 0 (Open), 1 (Closed), 2 (Undefined)
     
 class Annealer(Device):
-    air = Cpt(EpicsSignal, 'Sel')
-    status = Cpt(EpicsSignalRO, 'Sts') # status: 0 (Not In), 1 (In)
-    
+    air = Cpt(EpicsSignal, 'Air-Sel')
+    status = Cpt(EpicsSignalRO, 'In-Sts') # status: 0 (Not In), 1 (In)
+      
 
 #######################################################
 ### FMX
@@ -182,7 +182,6 @@ shutter_bcu = Shutter('XF:17IDC-ES:FMX{Gon:1-Sht}', name='shutter_bcu',
                  read_attrs=['status'])
 
 ## FMX annealer aka cryo blocker
-annealer = Annealer('XF:17IDC-ES:FMX{Wago:1}AnnealerAir-', name='annealer',
+annealer = Annealer('XF:17IDC-ES:FMX{Wago:1}Annealer', name='annealer',
                         read_attrs=[],
-                        labels=['fmx'])
-
+                        labels=['fmx'])  

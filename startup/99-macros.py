@@ -92,6 +92,11 @@ def anneal(t=1.0):
     govStateSet('CB')
     
     annealer.air.put(1)
+    
+    while not annealer.status.get():
+        #print(annealer.status.get())
+        time.sleep(0.1)
+    
     time.sleep(t)
     annealer.air.put(0)
     
