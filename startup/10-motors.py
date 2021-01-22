@@ -29,14 +29,14 @@ class YMotor(Device):
 
 
 class Slits(Device):
-	b = Cpt(EpicsMotor, '-Ax:B}Mtr')
-	i = Cpt(EpicsMotor, '-Ax:I}Mtr')
-	o = Cpt(EpicsMotor, '-Ax:O}Mtr')
-	t = Cpt(EpicsMotor, '-Ax:T}Mtr')
-	x_ctr = Cpt(EpicsMotor, '-Ax:XCtr}Mtr')
-	x_gap = Cpt(EpicsMotor, '-Ax:XGap}Mtr')
-	y_ctr = Cpt(EpicsMotor, '-Ax:YCtr}Mtr')
-	y_gap = Cpt(EpicsMotor, '-Ax:YGap}Mtr')
+	b = Cpt(EpicsMotor, '-Ax:B}Mtr', labels=['fmx'])
+	i = Cpt(EpicsMotor, '-Ax:I}Mtr', labels=['fmx'])
+	o = Cpt(EpicsMotor, '-Ax:O}Mtr', labels=['fmx'])
+	t = Cpt(EpicsMotor, '-Ax:T}Mtr', labels=['fmx'])
+	x_ctr = Cpt(EpicsMotor, '-Ax:XCtr}Mtr', labels=['fmx'])
+	x_gap = Cpt(EpicsMotor, '-Ax:XGap}Mtr', labels=['fmx'])
+	y_ctr = Cpt(EpicsMotor, '-Ax:YCtr}Mtr', labels=['fmx'])
+	y_gap = Cpt(EpicsMotor, '-Ax:YGap}Mtr', labels=['fmx'])
 
 
 class VirtualCenter(PVPositioner):
@@ -108,13 +108,17 @@ class Shutter(Device):
     open = Cpt(EpicsSignal, 'Cmd:Opn-Cmd.PROC')
     status = Cpt(EpicsSignalRO, 'Pos-Sts') # status: 0 (Open), 1 (Closed), 2 (Undefined)
     
+class Annealer(Device):
+    air = Cpt(EpicsSignal, 'Sel')
+    status = Cpt(EpicsSignalRO, 'Sts') # status: 0 (Not In), 1 (In)
+    
 
 #######################################################
 ### FMX
 #######################################################
 
 ## High Heat Load Slits
-hhls = Slits('XF:17IDA-OP:FMX{Slt:0', name='hhls')
+hhls = Slits('XF:17IDA-OP:FMX{Slt:0', name='hhls', labels=['fmx'])
 
 ## Horizontal Double Crystal Monochromator
 hdcm = HorizontalDCM('XF:17IDA-OP:FMX{Mono:DCM', name='hdcm')
@@ -128,10 +132,10 @@ mbpm2 = XYMotor('XF:17IDC-BI:FMX{BPM:2', name='mbpm2')
 mbpm3 = XYMotor('XF:17IDC-BI:FMX{BPM:3', name='mbpm3')
 
 ## Slits Motions
-slits1 = Slits('XF:17IDA-OP:FMX{Slt:1', name='slits1')
-slits2 = Slits('XF:17IDC-OP:FMX{Slt:2', name='slits2')
-slits3 = Slits('XF:17IDC-OP:FMX{Slt:3', name='slits3')
-slits4 = Slits('XF:17IDC-OP:FMX{Slt:4', name='slits4')
+slits1 = Slits('XF:17IDA-OP:FMX{Slt:1', name='slits1', labels=['fmx'])
+slits2 = Slits('XF:17IDC-OP:FMX{Slt:2', name='slits2', labels=['fmx'])
+slits3 = Slits('XF:17IDC-OP:FMX{Slt:3', name='slits3', labels=['fmx'])
+slits4 = Slits('XF:17IDC-OP:FMX{Slt:4', name='slits4', labels=['fmx'])
 
 ## KB Mirror
 kbm = KBMirror('XF:17IDC-OP:FMX{Mir', name='kbm')
@@ -177,4 +181,8 @@ shutter_hutch_c = Shutter('XF:17IDA-PPS:FMX{PSh}', name='shutter_hutch_c',
 shutter_bcu = Shutter('XF:17IDC-ES:FMX{Gon:1-Sht}', name='shutter_bcu',
                  read_attrs=['status'])
 
+## FMX annealer aka cryo blocker
+annealer = Annealer('XF:17IDC-ES:FMX{Wago:1}AnnealerAir-', name='annealer',
+                        read_attrs=[],
+                        labels=['fmx'])
 

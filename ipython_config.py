@@ -498,6 +498,7 @@ c.TerminalInteractiveShell.autocall = 2
 # etc., but can be unsafe because the code is actually evaluated on TAB.
 # c.IPCompleter.greedy = False
 
+c.IPCompleter.use_jedi = False
 #------------------------------------------------------------------------------
 # ScriptMagics configuration
 #------------------------------------------------------------------------------

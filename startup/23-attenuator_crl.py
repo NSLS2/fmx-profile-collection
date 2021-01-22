@@ -10,10 +10,10 @@ class AttenuatorLUT(Device):
     done = Cpt(EpicsSignalRO, '}attenDone')
 
 class AttenuatorBCU(Device):
-    a1 = Cpt(EpicsMotor, '-Ax:1}Mtr')
-    a2 = Cpt(EpicsMotor, '-Ax:2}Mtr')
-    a3 = Cpt(EpicsMotor, '-Ax:3}Mtr')
-    a4 = Cpt(EpicsMotor, '-Ax:4}Mtr')
+    a1 = Cpt(EpicsMotor, '-Ax:1}Mtr', labels=['fmx'])
+    a2 = Cpt(EpicsMotor, '-Ax:2}Mtr', labels=['fmx'])
+    a3 = Cpt(EpicsMotor, '-Ax:3}Mtr', labels=['fmx'])
+    a4 = Cpt(EpicsMotor, '-Ax:4}Mtr', labels=['fmx'])
     done = Cpt(EpicsSignalRO, '}attenDone')
 
 class RISlider(Device):
@@ -76,12 +76,15 @@ atten = AttenuatorLUT('XF:17IDC-OP:FMX{Attn:BCU', name='atten',
 
 ## BCU Attenuator
 atten_bcu = AttenuatorBCU('XF:17IDC-OP:FMX{Attn:BCU', name='atten_bcu',
-                          read_attrs=['done'])
+                          read_attrs=['done', 'a1', 'a2', 'a3', 'a4'],
+                          labels=['fmx'])
 
 ## RI Attenuator
 atten_ri = AttenuatorRI('XF:17IDC-OP:FMX{Attn:', name='atten_ri',
-                          read_attrs=[])
+                        read_attrs=[],
+                        labels=['fmx'])
 
 ## RI Transfocator
 transfocator = Transfocator('XF:17IDC-OP:FMX{CRL:', name='transfocator',
-                          read_attrs=[])
+                            read_attrs=[],
+                            labels=['fmx'])

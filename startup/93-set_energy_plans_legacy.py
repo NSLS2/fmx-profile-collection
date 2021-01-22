@@ -50,8 +50,8 @@ def hdcm_rock(hdcm_p_range=0.03, hdcm_p_points=51, logging=True):
 
     if logging:
         print('Energy = {:.1f} eV'.format(energy))       
-        print('HDCM cr2 pitch = {:.3f} mrad'.format(hdcm.p.user_readback.value))
-        print('BPM1 sum = {:.4g} A'.format(bpm1.sum_all.value))
+        print('HDCM cr2 pitch = {:.3f} mrad'.format(hdcm.p.user_readback.get()))
+        print('BPM1 sum = {:.4g} A'.format(bpm1.sum_all.get()))
         
     plt.close()
     
@@ -144,11 +144,11 @@ def set_energy(energy, hdcm_p_range=0.03, hdcm_p_points=51):
         # Prevent going below the lower limit or above the high limit
         if motor is ivu_gap:
             step_size = (stop - start) / (num - 1)
-            while motor.gap.user_setpoint.value + start < motor.gap.low_limit:
+            while motor.gap.user_setpoint.get() + start < motor.gap.low_limit:
                 start += 5*step_size
                 stop += 5*step_size
 
-            while motor.gap.user_setpoint.value + stop > motor.gap.high_limit:
+            while motor.gap.user_setpoint.get() + stop > motor.gap.high_limit:
                 start -= 5*step_size
                 stop -= 5*step_size
 

@@ -118,7 +118,7 @@ def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None, filep
     abs_move = abs(end - start)
     move_slack = abs_move*0.02
 
-    requested_time = cam.acquire_time.value*steps
+    requested_time = cam.acquire_time.get()*steps
     time_slack = requested_time
     total_time = requested_time + time_slack
 
@@ -127,7 +127,7 @@ def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None, filep
     minus_end = end + gap / 2
 
     if speed is None:
-        fps = cam.array_rate.value
+        fps = cam.array_rate.get()
         if fps:
             speed = 0.9*abs_move*fps/steps
         else:
@@ -389,7 +389,7 @@ def focus_scan(steps, step_size=2, speed=None, cam=cam_7, filename='test', folde
     move_slack = total_move*0.02
 
     if speed is None:
-        fps = cam.array_rate.value
+        fps = cam.array_rate.get()
         if fps:
             speed = 0.9*total_move*fps/steps
         else:
