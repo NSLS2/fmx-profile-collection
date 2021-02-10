@@ -48,7 +48,7 @@ import matplotlib
 from IPython import get_ipython
 
 # get_ipython().run_line_magic('matplotlib', 'widget')  # i.e. %matplotlib widget
-get_ipython().run_line_magic('matplotlib', 'notebook')
+# get_ipython().run_line_magic('matplotlib', 'notebook')
 import matplotlib.pyplot
 
 
@@ -58,9 +58,8 @@ import matplotlib.pyplot as plt
 plt.ion()
 
 # Make plots update live while scans run.
-from bluesky.utils import install_nb_kicker
-
-install_nb_kicker()
+# from bluesky.utils import install_nb_kicker
+# install_nb_kicker()
 
 # def isnotebook():
 #     try:

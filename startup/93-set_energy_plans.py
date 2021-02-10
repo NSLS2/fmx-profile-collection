@@ -199,9 +199,9 @@ def dcm_rock(dcm_p_range=0.03, dcm_p_points=51, logging=True, altDetector=False)
     )
 
     # Setup plots
-    ax1 = plt.subplot(111)
+    fig, ax1 = plt.subplots()
     ax1.grid(True)
-    plt.tight_layout()
+    # fig.tight_layout()
     
     # Decorate find_peaks to play along with our plot and plot the peak location
     def find_peak_inner(detector, motor, start, stop, num, ax):
@@ -232,7 +232,7 @@ def dcm_rock(dcm_p_range=0.03, dcm_p_points=51, logging=True, altDetector=False)
             time.sleep(2.0)  # Range switching is slow
             print('Keithley current = {:.4g} A'.format(keithley.get()))
         
-    plt.close()
+    # plt.close(fig)
         
     
 def ivu_gap_scan(start, end, steps, detector=bpm1, goToPeak=True):
