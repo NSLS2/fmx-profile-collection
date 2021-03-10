@@ -4,18 +4,6 @@ from ophyd.utils import set_and_wait
 
 beam_current = EpicsSignal('SR:OPS-BI{DCCT:1}I:Real-I')
 
-# Ugly, ugly hack (sorry)
-# Can't set the PV's precision, so I'll force it here
-class EpicsSignalPrec(EpicsSignal):
-    @property
-    def precision(self):
-        return 4
-    
-class EpicsSignalROPrec(EpicsSignal):
-    @property
-    def precision(self):
-        return 4
-
 # Undulator
 class InsertionDevice(Device):
     gap = Cpt(EpicsMotor, '-Ax:Gap}-Mtr',
