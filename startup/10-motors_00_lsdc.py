@@ -49,6 +49,14 @@ class HorizontalDCM(Device):
 	e = Cpt(EpicsMotor, '-Ax:E}Mtr')
 	w = Cpt(EpicsMotor, '-Ax:W}Mtr')
 
+class VerticalDCM(Device):
+    b = Cpt(EpicsMotor, '-Ax:B}Mtr')
+    g = Cpt(EpicsMotor, '-Ax:G}Mtr')
+    p = Cpt(EpicsMotor, '-Ax:P}Mtr')
+    r = Cpt(EpicsMotor, '-Ax:R}Mtr')
+    e = Cpt(EpicsMotor, '-Ax:E}Mtr')
+    w = Cpt(EpicsMotor, '-Ax:W}Mtr')
+
 class Cover(Device):
     close = Cpt(EpicsSignal, 'Cmd:Cls-Cmd')
     open = Cpt(EpicsSignal, 'Cmd:Opn-Cmd')
@@ -83,8 +91,11 @@ class Annealer(Device):
 ### FMX
 #######################################################
 
-## Horizontal Double Crystal Monochromator
+## Horizontal Double Crystal Monochromator (FMX)
 hdcm = HorizontalDCM('XF:17IDA-OP:FMX{Mono:DCM', name='hdcm')
+
+# Vertical Double Crystal Monochromator (AMX)
+vdcm = VerticalDCM('XF:17IDA-OP:AMX{Mono:DCM', name='vdcm')
 
 ## 17-ID-A FOE shutter
 shutter_foe = Shutter('XF:17ID-PPS:FAMX{Sh:FE}', name='shutter_foe',
