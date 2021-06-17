@@ -94,8 +94,8 @@ class EigerDetectorCamV33(EigerDetectorCam):
 class EigerBaseV26(EigerDetector):
     # cam = Cpt(EigerDetectorCamV33, 'cam1:')
     file = Cpt(EigerSimulatedFilePlugin, suffix='cam1:',
-               write_path_template='/GPFS/CENTRAL/xf17id1/mfuchs/fmxoperator/20200222/mx999999-1665/',
-               root='/GPFS/CENTRAL/xf17id1')
+               write_path_template='/GPFS/CENTRAL/xf17id2/mfuchs/fmxoperator/20200222/mx999999-1665/',
+               root='/GPFS/CENTRAL/xf17id2')
     image = Cpt(ImagePlugin, 'image1:')
     # stats1 = Cpt(StatsPluginV33, 'Stats1:')
     # stats2 = Cpt(StatsPluginV33, 'Stats2:')
