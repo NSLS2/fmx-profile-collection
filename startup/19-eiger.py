@@ -129,7 +129,7 @@ class EigerSingleTriggerV26(SingleTrigger, EigerBaseV26):
         self.stage_sigs['cam.trigger_mode'] = 0
         # self.stage_sigs['shutter_mode'] = 1  # 'EPICS PV'
         self.stage_sigs.update({'cam.num_triggers': 1,
-                                'cam.compression_algo': 'LZ4'})
+                                'cam.compression_algo': 'BS LZ4'})
 
     def stage(self, *args, **kwargs):
         return super().stage(*args, **kwargs)
