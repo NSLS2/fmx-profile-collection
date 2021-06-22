@@ -693,6 +693,6 @@ class Zebra(ZebraBase):
             }
         }
 
-zebra1 = Zebra('XF:17IDA-ES:FMX{Zeb:1}:', name='zebra1')
-zebra2 = Zebra('XF:17IDC-ES:FMX{Zeb:2}:', name='zebra2')
-zebra3 = Zebra('XF:17IDC-ES:FMX{Zeb:3}:', name='zebra3')
+# zebra1 = Zebra('XF:17IDA-ES:FMX{Zeb:1}:', name='zebra1')
+# zebra2 = Zebra('XF:17IDC-ES:FMX{Zeb:2}:', name='zebra2')
+# zebra3 = Zebra('XF:17IDC-ES:FMX{Zeb:3}:', name='zebra3')
