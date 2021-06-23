@@ -34,3 +34,6 @@ class VectorProgram(Device):
 
     active = Cpt(EpicsSignalRO, 'Sts:Running-Sts')
     state = Cpt(EpicsSignalRO, 'Sts:State-Sts')
+
+
+vector = VectorProgram('XF:17IDC-ES:FMX{Gon:1-Vec}', name='vector')
