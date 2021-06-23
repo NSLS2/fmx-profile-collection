@@ -36,6 +36,7 @@ class ZebraPositionCompare(Device):
     direction = Cpt(EpicsSignal, 'DIR', kind="config", auto_monitor=True)
     gate = Cpt(ZebraPCGate, 'GATE_', kind="config")
     pulse = Cpt(ZebraPCPulse, 'PULSE_')
+    time = Cpt(EpicsSignalRO, 'TIME', kind="omitted")
 
 
 class ZebraAnd(Device):
