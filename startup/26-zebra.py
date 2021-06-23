@@ -54,3 +54,6 @@ class Zebra(Device):
     out1 = Cpt(EpicsSignal, 'OUT1_TTL', kind="config", auto_monitor=True)
     pc = Cpt(ZebraPositionCompare, 'PC_')
     and1 = Cpt(ZebraAnd, 'AND1_')
+
+
+zebra = Zebra('XF:17IDC-ES:FMX{Zeb:3}:', name='zebra')
