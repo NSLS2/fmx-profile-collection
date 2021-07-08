@@ -165,6 +165,10 @@ def fmx_beamline_reference():
     print(msgStr)
     log_fmx(msgStr)
 
+    msgStr = "HDCM roll = " + "%.4f" % hdcm.r.user_readback.get() + " mrad"
+    print(msgStr)
+    log_fmx(msgStr)
+
     msgStr = "BPM1 posX = " + "%.2f" % bpm1.x.get()
     print(msgStr)
     log_fmx(msgStr)
@@ -177,14 +181,26 @@ def fmx_beamline_reference():
     print(msgStr)
     log_fmx(msgStr)
     
+    msgStr = "HFM pitch = " + "%.4f" % hfm.pitch.user_readback.get() + " mrad"
+    print(msgStr)
+    log_fmx(msgStr)
+
     msgStr = "VKB tweak voltage = " + "%.3f" % vkb_piezo_tweak.get() + " V"
     print(msgStr)
     log_fmx(msgStr)
     
+    msgStr = "VKB pitch = " + "%.4f" % kbm.vp.user_readback.get() + " urad"
+    print(msgStr)
+    log_fmx(msgStr)
+
     msgStr = "HKB tweak voltage = " + "%.3f" % hkb_piezo_tweak.get() + " V"
     print(msgStr)
     log_fmx(msgStr)
     
+    msgStr = "HKB pitch = " + "%.4f" % kbm.hp.user_readback.get() + " urad"
+    print(msgStr)
+    log_fmx(msgStr)
+
     msgStr = "Gonio X = " + "%.1f" % gonio.gx.user_readback.get() + " um"
     print(msgStr)
     log_fmx(msgStr)
@@ -198,5 +214,3 @@ def fmx_beamline_reference():
     log_fmx(msgStr)
     
     return
-    
-
