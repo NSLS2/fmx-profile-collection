@@ -4,6 +4,7 @@ from ophyd.sim import NullStatus
 from ophyd.status import SubscriptionStatus
 from bluesky import plan_stubs as bps
 from bluesky import preprocessors as bpp
+from mxtools.scans import (zebra_daq_prep, setup_zebra_vector_scan, setup_vector_program)
 
 class MXFlyer:
     def __init__(self, vector, zebra, eiger=None) -> None:
