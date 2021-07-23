@@ -1,18 +1,18 @@
 from ophyd import PVPositioner, PVPositionerPC, Device, Component as Cpt, EpicsMotor, EpicsSignal, EpicsSignalRO
 
 class YMotor(Device):
-	y = Cpt(EpicsMotor, '-Ax:Y}Mtr')
+	y = Cpt(EpicsMotor, '-Ax:Y}Mtr', labels=['fmx'])
 
 class XYMotor(Device):
-	x = Cpt(EpicsMotor, '-Ax:X}Mtr')
-	y = Cpt(EpicsMotor, '-Ax:Y}Mtr')
+	x = Cpt(EpicsMotor, '-Ax:X}Mtr', labels=['fmx'])
+	y = Cpt(EpicsMotor, '-Ax:Y}Mtr', labels=['fmx'])
 
 class XYZMotor(XYMotor):
-	z = Cpt(EpicsMotor, '-Ax:Z}Mtr')
+	z = Cpt(EpicsMotor, '-Ax:Z}Mtr', labels=['fmx'])
 
 class XZXYMotor(Device):
-	x = Cpt(EpicsMotor, '-Ax:X}Mtr')
-	z = Cpt(EpicsMotor, '-Ax:Z}Mtr')
+	x = Cpt(EpicsMotor, '-Ax:X}Mtr', labels=['fmx'])
+	z = Cpt(EpicsMotor, '-Ax:Z}Mtr', labels=['fmx'])
 
 class XYZfMotor(Device):
 	x = Cpt(EpicsMotor, '-Ax:Xf}Mtr')
@@ -42,12 +42,12 @@ class VirtualGap(PVPositioner):
 	done_value = 1
 
 class HorizontalDCM(Device):
-	b = Cpt(EpicsMotor, '-Ax:B}Mtr')
-	g = Cpt(EpicsMotor, '-Ax:G}Mtr')
-	p = Cpt(EpicsMotor, '-Ax:P}Mtr')
-	r = Cpt(EpicsMotor, '-Ax:R}Mtr')
-	e = Cpt(EpicsMotor, '-Ax:E}Mtr')
-	w = Cpt(EpicsMotor, '-Ax:W}Mtr')
+	b = Cpt(EpicsMotor, '-Ax:B}Mtr', labels=['fmx'])
+	g = Cpt(EpicsMotor, '-Ax:G}Mtr', labels=['fmx'])
+	p = Cpt(EpicsMotor, '-Ax:P}Mtr', labels=['fmx'])
+	r = Cpt(EpicsMotor, '-Ax:R}Mtr', labels=['fmx'])
+	e = Cpt(EpicsMotor, '-Ax:E}Mtr', labels=['fmx'])
+	w = Cpt(EpicsMotor, '-Ax:W}Mtr', labels=['fmx'])
 
 class VerticalDCM(Device):
     b = Cpt(EpicsMotor, '-Ax:B}Mtr')
@@ -71,16 +71,16 @@ class ShutterTranslation(Device):
 	x = Cpt(EpicsMotor, '-Ax:X}Mtr')
 
 class GoniometerStack(Device):
-	gx = Cpt(EpicsMotor, '-Ax:GX}Mtr')
-	gy = Cpt(EpicsMotor, '-Ax:GY}Mtr')
-	gz = Cpt(EpicsMotor, '-Ax:GZ}Mtr')
-	o  = Cpt(EpicsMotor, '-Ax:O}Mtr')
-	py = Cpt(EpicsMotor, '-Ax:PY}Mtr')
-	pz = Cpt(EpicsMotor, '-Ax:PZ}Mtr')
+	gx = Cpt(EpicsMotor, '-Ax:GX}Mtr', labels=['fmx'])
+	gy = Cpt(EpicsMotor, '-Ax:GY}Mtr', labels=['fmx'])
+	gz = Cpt(EpicsMotor, '-Ax:GZ}Mtr', labels=['fmx'])
+	o  = Cpt(EpicsMotor, '-Ax:O}Mtr', labels=['fmx'])
+	py = Cpt(EpicsMotor, '-Ax:PY}Mtr', labels=['fmx'])
+	pz = Cpt(EpicsMotor, '-Ax:PZ}Mtr', labels=['fmx'])
 
 class BeamStop(Device):
-	fx = Cpt(EpicsMotor, '-Ax:FX}Mtr')
-	fy = Cpt(EpicsMotor, '-Ax:FY}Mtr')
+	fx = Cpt(EpicsMotor, '-Ax:FX}Mtr', labels=['fmx'])
+	fy = Cpt(EpicsMotor, '-Ax:FY}Mtr', labels=['fmx'])
     
 class Annealer(Device):
     air = Cpt(EpicsSignal, 'Air-Sel')
@@ -121,6 +121,7 @@ slits1 = Slits('XF:17IDA-OP:FMX{Slt:1', name='slits1', labels=['fmx'])
 slits2 = Slits('XF:17IDC-OP:FMX{Slt:2', name='slits2', labels=['fmx'])
 slits3 = Slits('XF:17IDC-OP:FMX{Slt:3', name='slits3', labels=['fmx'])
 slits4 = Slits('XF:17IDC-OP:FMX{Slt:4', name='slits4', labels=['fmx'])
+slits5 = Slits('XF:17IDC-OP:FMX{Slt:5', name='slits5', labels=['fmx'])
 
 ## BPM Motions
 mbpm1 = XYMotor('XF:17IDA-BI:FMX{BPM:1', name='mbpm1')
