@@ -3,7 +3,10 @@ from mxtools.zebra import Zebra
 from mxtools.flyer import MXFlyer, actual_scan
 from mxtools.eiger import EigerSingleTriggerV26, set_eiger_defaults
 from mxtools.scans import setup_eiger_arming
+from mxtools.handlers import EigerHandlerMX
 
+
+db.reg.register_handler(EigerHandlerMX.spec, EigerHandlerMX)
 
 vector = VectorProgram('XF:17IDC-ES:FMX{Gon:1-Vec}', name='vector')
 zebra = Zebra('XF:17IDC-ES:FMX{Zeb:3}:', name='zebra')
