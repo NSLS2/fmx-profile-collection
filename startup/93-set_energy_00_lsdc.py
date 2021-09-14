@@ -202,7 +202,7 @@ def dcm_rock(dcm_p_range=0.03, dcm_p_points=51, logging=True, altDetector=False)
         if detector == bpm1:
             det_name = detector.name+'_sum_all'
         else:
-            det_name = detector.name                
+            det_name = detector.name
         mot_name = motor.name+'_user_setpoint'
 
         @bpp.subs_decorator(LivePlot(det_name, mot_name, ax=ax))
