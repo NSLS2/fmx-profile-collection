@@ -42,3 +42,4 @@ for camera in all_standard_pros:
     camera.stats4.centroid.read_attrs = ['x', 'y']
     camera.tiff.read_attrs = []
 
+cam_fs2.stats1.total.kind = 'hinted'
