@@ -83,9 +83,10 @@ class BeamStop(Device):
 	fy = Cpt(EpicsMotor, '-Ax:FY}Mtr', labels=['fmx'])
     
 class Annealer(Device):
-    air = Cpt(EpicsSignal, 'Air-Sel')
-    status = Cpt(EpicsSignalRO, 'In-Sts') # status: 0 (Not In), 1 (In)
-      
+    air = Cpt(EpicsSignal, '1}AnnealerAir-Sel')
+    inStatus = Cpt(EpicsSignalRO, '2}AnnealerIn-Sts') # status: 0 (Not In), 1 (In)
+    outStatus = Cpt(EpicsSignalRO, '2}AnnealerOut-Sts') # status: 0 (Not In), 1 (In)
+    
 
 #######################################################
 ### FMX
@@ -148,8 +149,7 @@ pif = XYZfMotor('XF:17IDC-ES:FMX{Gon:1', name='pif')
 bs = BeamStop('XF:17IDC-ES:FMX{BS:1', name='bs')
 
 ## FMX annealer aka cryo blocker
-annealer = Annealer('XF:17IDC-ES:FMX{Wago:1}Annealer', name='annealer',
+annealer = Annealer('XF:17IDC-ES:FMX{Wago:', name='annealer',
                         read_attrs=[],
                         labels=['fmx'])
-
 

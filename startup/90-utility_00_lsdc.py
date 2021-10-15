@@ -11,6 +11,15 @@ BL_calibration = BeamlineCalibrations('XF:17ID-ES:FMX{Misc-',
                                       read_attrs=['LoMagCal', 'HiMagCal'])
 
 
+class PuckSafety(Device):
+    On = Cpt(EpicsSignal, 'On.PROC')
+    Off = Cpt(EpicsSignal, 'Off.PROC')
+    
+## Robot dewar puck safety system
+puck_safety = PuckSafety('XF:17IDC-OP:FMX{DewarSwitch}Seq', name='puck_safety',
+                        read_attrs=[],
+                        labels=['fmx'])
+
 def blStrGet():
     """
     Return beamline string

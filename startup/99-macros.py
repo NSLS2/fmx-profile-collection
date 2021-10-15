@@ -93,12 +93,16 @@ def anneal(t=1.0):
     
     annealer.air.put(1)
     
-    while not annealer.status.get():
-        #print(annealer.status.get())
+    while not annealer.inStatus.get():
+        #print(annealer.inStatus.get())
         time.sleep(0.1)
     
     time.sleep(t)
     annealer.air.put(0)
+    
+    while not annealer.outStatus.get():
+        #print(annealer.outStatus.get())
+        time.sleep(0.1)
     
     govStateSet('SA')
     
