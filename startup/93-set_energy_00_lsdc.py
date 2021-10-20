@@ -393,10 +393,12 @@ def setE(energy,
         print('FOE shutter closed. Has to be open for this to work. Exiting')
         return -1
         
+    # DCM rocking curve
     print('Rocking monochromator')
     yield from dcm_rock(dcm_p_range=dcm_p_range, dcm_p_points=dcm_p_points, altDetector=altDetector)
     time.sleep(1)
-        
+    
+    # Undulator gap scan
     print('Scanning undulator gap')
     start = ivu_gap.gap.user_readback.get() - ivuGapStartOff
     end = ivu_gap.gap.user_readback.get() + ivuGapEndOff
@@ -409,6 +411,11 @@ def setE(energy,
         print('ivu_gap_scan() successful')
         time.sleep(1)
     
+    # Activate sector 17 photon local feedback
+    photon_local_feedback_c17.x_enable.put(1)
+    photon_local_feedback_c17.y_enable.put(1)
+    
+    # Align LSDC microscope center to beam center
     if beamCenterAlign:
         # Check for pre-conditions for beam_center_align()
         if shutter_hutch_c.status.get():
