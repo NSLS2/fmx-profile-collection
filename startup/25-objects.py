@@ -1,6 +1,6 @@
 from mxtools.vector_program import VectorProgram
 from mxtools.zebra import Zebra
-from mxtools.flyer import MXFlyer, actual_scan
+from mxtools.flyer import MXFlyer
 from mxtools.eiger import EigerSingleTriggerV26, set_eiger_defaults
 from mxtools.scans import setup_eiger_arming
 from mxtools.handlers import EigerHandlerMX
