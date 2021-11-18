@@ -2,7 +2,6 @@ from mxtools.vector_program import VectorProgram
 from mxtools.zebra import Zebra
 from mxtools.flyer import MXFlyer
 from mxtools.eiger import EigerSingleTriggerV26, set_eiger_defaults
-from mxtools.scans import setup_eiger_arming
 from mxtools.handlers import EigerHandlerMX
 
 
@@ -15,4 +14,4 @@ eiger_single = EigerSingleTriggerV26("XF:17IDC-ES:FMX{Det:Eig16M}",
 # TODO: uncomment for V33
 # eiger_single.cam.ensure_nonblocking()
 set_eiger_defaults(eiger_single)
-mx_flyer = MXFlyer(vector=vector, zebra=zebra, eiger=eiger_single)
+mx_flyer = MXFlyer(vector=vector, zebra=zebra, detector=eiger_single)
