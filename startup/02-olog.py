@@ -16,4 +16,4 @@
 # RE.subscribe('start', cb)
 
 ip = get_ipython()
-nslsii.configure_olog(user_ns=ip.user_ns)
+# nslsii.configure_olog(user_ns=ip.user_ns)

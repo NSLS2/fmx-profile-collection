@@ -110,12 +110,6 @@ def setE_motors_FMX(energy):
     LGP = {m: epics.caget(LGP_fmt.format(m.name))
            for m in (kbm.hp, kbm.hx, kbm.vp, kbm.vy)}
 
-    # Open Slits 1 (FMX specific)
-    yield from bps.mv(
-        slits1.x_gap, 3000,
-        slits1.y_gap, 2000
-    )
-    
     # Remove CRLs if going to energy < 9 keV (FMX specific)
     if energy < 9001:
         set_beamsize('V0','H0')
@@ -208,7 +202,7 @@ def dcm_rock(dcm_p_range=0.03, dcm_p_points=51, logging=True, altDetector=False)
         if detector == bpm1:
             det_name = detector.name+'_sum_all'
         else:
-            det_name = detector.name                
+            det_name = detector.name
         mot_name = motor.name+'_user_setpoint'
 
         @bpp.subs_decorator(LivePlot(det_name, mot_name, ax=ax))
@@ -232,8 +226,7 @@ def dcm_rock(dcm_p_range=0.03, dcm_p_points=51, logging=True, altDetector=False)
             time.sleep(2.0)  # Range switching is slow
             print('Keithley current = {:.4g} A'.format(keithley.get()))
         
-    # plt.close(fig)
-        
+    plt.close(fig)
     
 def ivu_gap_scan(start, end, steps, detector=bpm1, goToPeak=True):
     """
@@ -327,7 +320,7 @@ def ivu_gap_scan(start, end, steps, detector=bpm1, goToPeak=True):
 def setE(energy,
          dcm_p_range=0.03, dcm_p_points=51, altDetector=False,
          ivuGapStartOff=70, ivuGapEndOff=70, ivuGapSteps=31,
-         transSet='All', beamCenterAlign=True):
+         transSet='All', beamCenterAlign=True, slit1Set=True):
     """
     Automated photon energy change. Master function calling four subroutines:
     * setE_motors_FMX():    Set photon delivery system motor positions for a chosen energy
@@ -365,6 +358,9 @@ def setE(energy,
     beamCenterAlign: Set to False to skip beam_center_align() step (like the old set_energy() routine)
                      Default True
     
+    slit1Set: Set to False to skip setting Slit 1 Gap values
+                     Default True
+    
     Examples
     --------
     
@@ -373,11 +369,13 @@ def setE(energy,
     RE(setE(12660, transSet='RI'))
     RE(setE(20000, ivuGapStartOff=100, ivuGapEndOff=150, ivuGapSteps=91))
     RE(setE(9000, beamCenterAlign=False))
+    RE(setE(12660, beamCenterAlign=False, slit1Set=False))
     """
     
     # Store initial Slit 1 gap positions
-    slits1XGapOrg = slits1.x_gap.user_readback.get()
-    slits1YGapOrg = slits1.y_gap.user_readback.get()
+    if slit1Set:
+        slits1XGapOrg = slits1.x_gap.user_readback.get()
+        slits1YGapOrg = slits1.y_gap.user_readback.get()
     
     print('Setting FMX motor positions')
     try:
@@ -394,10 +392,12 @@ def setE(energy,
         print('FOE shutter closed. Has to be open for this to work. Exiting')
         return -1
         
+    # DCM rocking curve
     print('Rocking monochromator')
     yield from dcm_rock(dcm_p_range=dcm_p_range, dcm_p_points=dcm_p_points, altDetector=altDetector)
     time.sleep(1)
-        
+    
+    # Undulator gap scan
     print('Scanning undulator gap')
     start = ivu_gap.gap.user_readback.get() - ivuGapStartOff
     end = ivu_gap.gap.user_readback.get() + ivuGapEndOff
@@ -410,6 +410,11 @@ def setE(energy,
         print('ivu_gap_scan() successful')
         time.sleep(1)
     
+    # Activate sector 17 photon local feedback
+    photon_local_feedback_c17.x_enable.put(1)
+    photon_local_feedback_c17.y_enable.put(1)
+    
+    # Align LSDC microscope center to beam center
     if beamCenterAlign:
         # Check for pre-conditions for beam_center_align()
         if shutter_hutch_c.status.get():
@@ -423,6 +428,7 @@ def setE(energy,
         yield from beam_center_align(transSet=transSet)
     
     # Restore initial Slit 1 gap positions
-    yield from bps.mv(slits1.x_gap, slits1XGapOrg)  # Move Slit 1 X to original position
-    yield from bps.mv(slits1.y_gap, slits1YGapOrg)  # Move Slit 1 Y to original position
+    if slit1Set:
+        yield from bps.mv(slits1.x_gap, slits1XGapOrg)  # Move Slit 1 X to original position
+        yield from bps.mv(slits1.y_gap, slits1YGapOrg)  # Move Slit 1 Y to original position
     

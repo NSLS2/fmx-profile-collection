@@ -4,18 +4,6 @@ from ophyd.utils import set_and_wait
 
 beam_current = EpicsSignal('SR:OPS-BI{DCCT:1}I:Real-I')
 
-# Ugly, ugly hack (sorry)
-# Can't set the PV's precision, so I'll force it here
-class EpicsSignalPrec(EpicsSignal):
-    @property
-    def precision(self):
-        return 4
-    
-class EpicsSignalROPrec(EpicsSignal):
-    @property
-    def precision(self):
-        return 4
-
 # Undulator
 class InsertionDevice(Device):
     gap = Cpt(EpicsMotor, '-Ax:Gap}-Mtr',
@@ -33,3 +21,9 @@ class InsertionDevice(Device):
 
 ivu_gap = InsertionDevice('SR:C17-ID:G1{IVU21:2', name='ivu')
 
+# Photon Local Feedback, sector 17 orbit angle correction onto FMX XBPM1
+class PhotonLocalFeedback(Device):
+    x_enable = Cpt(EpicsSignal, 'X-FdbkEnabled')
+    y_enable = Cpt(EpicsSignal, 'Y-FdbkEnabled')
+
+photon_local_feedback_c17 = PhotonLocalFeedback('SR:APHLA:LBAgent{BUMP:C17-R7X2}', name='photon_local_feedback')
