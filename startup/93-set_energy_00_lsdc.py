@@ -227,7 +227,6 @@ def dcm_rock(dcm_p_range=0.03, dcm_p_points=51, logging=True, altDetector=False)
             print('Keithley current = {:.4g} A'.format(keithley.get()))
         
     plt.close(fig)
-        
     
 def ivu_gap_scan(start, end, steps, detector=bpm1, goToPeak=True):
     """

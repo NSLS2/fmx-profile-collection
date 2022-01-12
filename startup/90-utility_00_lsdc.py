@@ -29,9 +29,9 @@ def blStrGet():
     Beamline is determined by querying hostname
     """
     hostStr = socket.gethostname()
-    if hostStr == 'xf17id2-ca1':
+    if hostStr.startswith('xf17id2'):
         blStr = 'FMX'
-    elif hostStr == 'xf17id1-ca1':
+    elif hostStr.startswith('xf17id1'):
         blStr = 'AMX'
     else: 
         print('Error - this code must be executed on one of the -ca1 machines')

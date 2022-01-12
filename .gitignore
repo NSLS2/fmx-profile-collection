@@ -63,3 +63,6 @@ target/
 
 db/
 history*.sqlite
+
+.vscode
+startup/.vscode
