@@ -8,12 +8,12 @@ resources:
 
 jobs:
   - template: nsls2-collection-2022-1.0-py39.yml@templates
-    name: run_profile_collection_2022_1_0_py39_mxtools_main
+    job: run_profile_collection_2022_1_0_py39_mxtools_main
     parameters:
       beamline_acronym: FMX
       mxtools_branch: main
   - template: nsls2-collection-2022-1.0-py39.yml@templates
-    name: run_profile_collection_2022_1_0_py39_mxtools_pr
+    job: run_profile_collection_2022_1_0_py39_mxtools_pr
     parameters:
       beamline_acronym: FMX
       mxtools_branch: fmx-profile_collection-classes
