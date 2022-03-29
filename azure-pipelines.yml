@@ -3,10 +3,14 @@ resources:
     - repository: templates
       type: github
       name: NSLS-II/profile-collection-ci
-      ref: refs/heads/main
+      ref: refs/heads/test-unique-job-names
       endpoint: github
 
 jobs:
+  - template: nsls2-collection-2022-1.0-py39.yml@templates
+    parameters:
+      beamline_acronym: FMX
+      mxtools_branch: main
   - template: nsls2-collection-2022-1.0-py39.yml@templates
     parameters:
       beamline_acronym: FMX
