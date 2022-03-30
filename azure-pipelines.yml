@@ -10,8 +10,10 @@ jobs:
   - template: nsls2-collection-2022-1.0-py39.yml@templates
     parameters:
       beamline_acronym: FMX
+    variables:
       mxtools_branch: main
   - template: nsls2-collection-2022-1.0-py39.yml@templates
     parameters:
       beamline_acronym: FMX
+    variables:
       mxtools_branch: fmx-profile_collection-classes
