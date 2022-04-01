@@ -228,6 +228,7 @@ def dcm_rock(dcm_p_range=0.03, dcm_p_points=51, logging=True, altDetector=False)
         
     plt.close(fig)
     
+    
 def ivu_gap_scan(start, end, steps, detector=bpm1, goToPeak=True):
     """
     Scans the IVU21 gap against a detector, and moves the gap to the peak plus a
