@@ -1,58 +1,20 @@
-from ophyd import Device, Component as Cpt, EpicsSignal, EpicsSignalRO
-import socket
+from functools import partial
+from mxtools.fmx.utility import BeamlineCalibrations, PuckSafety, blStrGet, get_energy
 
-
-class BeamlineCalibrations(Device):
-    LoMagCal = Cpt(EpicsSignal, 'LoMagCal}')
-    HiMagCal = Cpt(EpicsSignal, 'HiMagCal}')
 
 BL_calibration = BeamlineCalibrations('XF:17ID-ES:FMX{Misc-',
                                       name='BL_calibration',
                                       read_attrs=['LoMagCal', 'HiMagCal'])
 
-
-class PuckSafety(Device):
-    On = Cpt(EpicsSignal, 'On.PROC')
-    Off = Cpt(EpicsSignal, 'Off.PROC')
-    
 ## Robot dewar puck safety system
 puck_safety = PuckSafety('XF:17IDC-OP:FMX{DewarSwitch}Seq', name='puck_safety',
                         read_attrs=[],
                         labels=['fmx'])
 
-def blStrGet():
-    """
-    Return beamline string
-    
-    blStr: 'AMX' or 'FMX'
-    
-    Beamline is determined by querying hostname
-    """
-    hostStr = socket.gethostname()
-    if hostStr.startswith('xf17id2'):
-        blStr = 'FMX'
-    elif hostStr.startswith('xf17id1'):
-        blStr = 'AMX'
-    else: 
-        print('Error - this code must be executed on one of the -ca1 machines')
-        blStr = -1
-        
-    return blStr
+get_energy = partial(get_energy, hdcm=hdcm)
 
+# Example for unpacking kwargs:
+# kwargs = {"param1": "test1",
+#           "param2": "test2",}
 
-def get_energy():
-    """
-    Returns the current photon energy in eV derived from the DCM Bragg angle
-    """ 
-    
-    blStr = blStrGet()
-    if blStr == -1: return -1
-    
-    if blStr == 'AMX':
-        energy = vdcm.e.user_readback.get()
-    elif blStr == 'FMX':
-        energy = hdcm.e.user_readback.get()
-    
-    return energy
-
-
+# my_plan = partial(my_plan, **kwargs)
