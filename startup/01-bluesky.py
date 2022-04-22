@@ -15,7 +15,7 @@ import appdirs
 from bluesky.utils import PersistentDict
 
 # runengine_metadata_dir = appdirs.user_data_dir(appname="bluesky") / Path("runengine-metadata")
-runengine_metadata_dir = Path(f"/GPFS/CENTRAL/xf17id1/skinnerProjectsBackup/bnlpx_config/{BEAMLINE_ID}_bluesky_config/")
+runengine_metadata_dir = Path(f"/nsls2/data/{BEAMLINE_ID}/shared/config/{BEAMLINE_ID}_bluesky_config/")
 
 # PersistentDict will create the directory if it does not exist
 RE.md = PersistentDict(runengine_metadata_dir)
