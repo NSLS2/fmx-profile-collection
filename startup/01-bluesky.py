@@ -3,7 +3,8 @@ import nslsii
 BEAMLINE_ID = 'fmx'
 
 # nslsii.configure_base(get_ipython().user_ns, BEAMLINE_ID)
-nslsii.configure_base(get_ipython().user_ns, BEAMLINE_ID, pbar=False, publish_documents_with_kafka=True) # Progress bar for scans
+nslsii.configure_base(get_ipython().user_ns, BEAMLINE_ID, pbar=False,
+                      publish_documents_with_kafka=True) # Progress bar for scans
 
 # Disable plots via BestEffortCallback:
 bec.disable_plots()
