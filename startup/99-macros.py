@@ -38,6 +38,10 @@ def help_fmx():
     xf_e2bragg()    - Returns Bragg angle t in deg for given Energy in eV
     xf_detZ2recResolution() - Given detector to sample distance, returns resolution at edge
     xf_recResolution2detZ() - Given resolution at edge, returns detector to sample distance
+    xrf_spectrum_acquire()  - Acquire an X-ray Fluorescence spectrum from the XIA Mercury MCA
+    xrf_spectrum_collect()  - Collect an X-ray Fluorescence spectrum from the XIA Mercury MCA
+    xrf_spectrum_read() - Read the current XIA Mercury spectrum from the MCA ophyd object
+    xrf_spectrum_plot() - Plot a XIA Mercury XRF spectrum
 
     Use help() to get more info, e.g. help(setE)
     """)
