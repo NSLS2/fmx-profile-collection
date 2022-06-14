@@ -1,6 +1,8 @@
 import epics
 import numpy as np
+import matplotlib.pyplot as plt
 import time
+from lmfit import Model
 
 #import bluesky.preprocessors as bpp
 #import bluesky.plans as bp
@@ -14,7 +16,8 @@ def help_fmx():
     print("""
     FMX beamline functions:
     
-    beam_center_align()     - Align goniometer and LSDC beam center to current beam position
+    beam_center_align() - Align goniometer and LSDC beam center to current beam position
+    beam_center_fit()   - Fit beam center to line
     center_pin()    - Center an alignment pin in Y
     dcm_rock()      - Scan DCM crystal 2 pitch to maximize flux on BPM1
     fmx_dose()      - Caluclate dose for a set of LSDC settings
@@ -257,6 +260,7 @@ def xf_bragg2e(t, h=1, k=1, l=1, LN=0):
     
     return E
 
+
 def xf_e2bragg(E, h=1, k=1, l=1):
     """
     Returns Bragg angle t in deg for given Energy in eV
@@ -274,6 +278,7 @@ def xf_e2bragg(E, h=1, k=1, l=1):
     
     return t
 
+
 def xf_detZ2recResolution(detZ, xLambda, D=327.8):
     """
     Given detector to sample distance detZ, returns resolution at edge recResolution
@@ -290,6 +295,7 @@ def xf_detZ2recResolution(detZ, xLambda, D=327.8):
     
     return recResolution
 
+
 def xf_recResolution2detZ(recResolution, xLambda, D=327.8):
     """
     Given resolution at edge recResolution, returns detector to sample distance detZ
@@ -305,3 +311,43 @@ def xf_recResolution2detZ(recResolution, xLambda, D=327.8):
     detZ = 0.5*D/np.tan(2*np.arcsin(xLambda/(2*recResolution)))
     
     return detZ  
+
+
+def beam_center_fit(dz, orgX, orgY):
+    """
+    Fit beam center to line
+    
+    Parameters
+    ----------
+    dz : detectors distance [mm]
+    orgX : Beam center X coordinate [px]
+    orgY : Beam center Y coordinate [px]
+    
+    Example
+    -------
+    dz=[150, 300, 450]
+    orgX=[2002,2001,2001]
+    orgY=[2251,2241,2232]
+    beam_center_fit(dz, orgX, orgY)
+    """
+    
+    def linear(x, m, b):
+        """Line: linear(x, m, b) = m*x + b"""
+        return (m*x + b)
+    
+    gmodel = Model(linear)
+    
+    print('orgX')
+    orgXresult = gmodel.fit(orgX, x=dz, m=-0.005, b=2000)
+    display(orgXresult.params)
+    plt.figure(1)
+    orgXresult.plot_fit(xlabel='dz [mm]', ylabel='orgX [px]')
+    plt.show()
+    
+    print('orgY')
+    orgYresult = gmodel.fit(orgY, x=dz, m=-0.05, b=2250)
+    display(orgYresult.params)
+    plt.figure(2)
+    orgYresult.plot_fit(xlabel='dz [mm]', ylabel='orgY [px]')
+    plt.show()
+    
