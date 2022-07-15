@@ -139,6 +139,12 @@ def beam_center_align(transSet='All'):
     RE(beam_center_align(transSet='None'))
     RE(beam_center_align(transSet='RI'))
     """
+    # TODO:
+    #  * Check for Vis screen actuators out
+    #  * Check for C-hutch shutter open
+    #  * Check for ROI2 exceeding camera border.
+    #    Check how this affects the ROI centering move, and whether we can correct for that
+    
     # Which beamline?
     blStr = blStrGet()
     if blStr == -1: return -1
@@ -153,9 +159,16 @@ def beam_center_align(transSet='All'):
             return -1
         
     if not govStatusGet('SA'):
-        print('Not in Governor state SA, exiting')
+        print('Not in Governor state SA, exiting.')
         return -1
     
+    # Check for beam after DCM: BPM1 total current
+    if bpm1.sum_all.get() < 1e-7:
+        print('Intensity after DCM low. BPM1 total current <1e-7 A.',
+              'Check FOE shutter, and rocking curve, then repeat.',
+              'Exiting.')
+        return -1
+        
     print('Closing detector cover')
     detectorCoverClose()
     
@@ -195,61 +208,75 @@ def beam_center_align(transSet='All'):
     
     yield from bps.mv(shutter_bcu.open, 1)
     print('BCU Shutter Open')
-    
-    # Camera calibration [um/px]
-    hiMagCal = BL_calibration.HiMagCal.get()
-    loMagCal = BL_calibration.LoMagCal.get()
-    
-    # Read centroids
     time.sleep(1)
-    beamHiMagCentroid = centroid_avg(cam_8.stats4)
-    beamHiMagCentroidX = beamHiMagCentroid[0]
-    beamHiMagCentroidY = beamHiMagCentroid[1]
-    time.sleep(1)
-
-    # Get beam shift on Hi Mag
-    # Assume the LSDC centering crosshair is in the center of the FOV
-    # This works as long as cam_8 ROI1 does not hit the edge of the cam_8 image
-    beamHiMagDiffX = beamHiMagCentroidX - (cam_8.roi4.size.x.get()/2)
-    beamHiMagDiffY = beamHiMagCentroidY - (cam_8.roi4.size.y.get()/2)
     
-    # Correct Mag 4 (cam_8 ROI1)
-    # Adjust cam_8 ROI1 min_y, LSDC uses this for the Mag4 FOV.
-    # This works as long as cam_8 ROI1 does not hit the edge of the cam_8 image
-    cam_8.roi1.min_xyz.min_x.put(cam_8.roi1.min_xyz.min_x.get() + beamHiMagDiffX)
-    cam_8.roi1.min_xyz.min_y.put(cam_8.roi1.min_xyz.min_y.get() + beamHiMagDiffY)
-    
-    # Correct Mag 3 (cam_8 ROI2)
-    cam_8.roi2.min_xyz.min_x.put(cam_8.roi2.min_xyz.min_x.get() + beamHiMagDiffX)
-    cam_8.roi2.min_xyz.min_y.put(cam_8.roi2.min_xyz.min_y.get() + beamHiMagDiffY)
-    
-    # Get beam shift on Lo Mag from Hi Mag shift and calibration factor ratio
-    beamLoMagDiffX = beamHiMagDiffX * hiMagCal/loMagCal
-    beamLoMagDiffY = beamHiMagDiffY * hiMagCal/loMagCal
-    
-    # Correct Mag 1 (cam_7 ROI2)
-    cam_7.roi2.min_xyz.min_x.put(cam_7.roi2.min_xyz.min_x.get() + beamLoMagDiffX)
-    cam_7.roi2.min_xyz.min_y.put(cam_7.roi2.min_xyz.min_y.get() + beamLoMagDiffY)
-    
-    # Correct Mag 2 (cam_7 ROI3)
-    cam_7.roi3.min_xyz.min_x.put(cam_7.roi3.min_xyz.min_x.get() + beamLoMagDiffX)
-    cam_7.roi3.min_xyz.min_y.put(cam_7.roi3.min_xyz.min_y.get() + beamLoMagDiffY)
-    
-    time.sleep(3)
-    
+    # Check for focused beam on scinti. Do nothing if stats 4 max intensity < 20 counts
+    # TODO: Verify 20 counts threshold for more settings
+    if cam_8.stats4.max_value.get() < 20:
+        print('Max intensity < 20 counts.',
+              'Check beam intensity and focus on scinti, then repeat.',
+              'No changes made.')
+    else:
+        # Camera calibration [um/px]
+        hiMagCal = BL_calibration.HiMagCal.get()
+        loMagCal = BL_calibration.LoMagCal.get()
+        
+        # Read centroids
+        beamHiMagCentroid = centroid_avg(cam_8.stats4)
+        beamHiMagCentroidX = beamHiMagCentroid[0]
+        beamHiMagCentroidY = beamHiMagCentroid[1]
+        time.sleep(1)
+        
+        # Get beam shift on Hi Mag
+        # Assume the LSDC centering crosshair is in the center of the FOV
+        # This works as long as cam_8 ROI1 does not hit the edge of the cam_8 image
+        beamHiMagDiffX = beamHiMagCentroidX - (cam_8.roi4.size.x.get()/2)
+        beamHiMagDiffY = beamHiMagCentroidY - (cam_8.roi4.size.y.get()/2)
+        
+        # Do nothing if we see a too large shift
+        if beamHiMagDiffX>100 or beamHiMagDiffY>100:
+            print('Beam centroid change > 100 px detected.',
+                  'No changes made. Manual beam center correction needed.')
+            beamHiMagDiffX=0
+            beamHiMagDiffY=0
+        
+        # Correct Mag 4 (cam_8 ROI1)
+        # Adjust cam_8 ROI1 min_y, LSDC uses this for the Mag4 FOV.
+        # This works as long as cam_8 ROI1 does not hit the edge of the cam_8 image
+        cam_8.roi1.min_xyz.min_x.put(cam_8.roi1.min_xyz.min_x.get() + beamHiMagDiffX)
+        cam_8.roi1.min_xyz.min_y.put(cam_8.roi1.min_xyz.min_y.get() + beamHiMagDiffY)
+        
+        # Correct Mag 3 (cam_8 ROI2)
+        cam_8.roi2.min_xyz.min_x.put(cam_8.roi2.min_xyz.min_x.get() + beamHiMagDiffX)
+        cam_8.roi2.min_xyz.min_y.put(cam_8.roi2.min_xyz.min_y.get() + beamHiMagDiffY)
+        
+        # Get beam shift on Lo Mag from Hi Mag shift and calibration factor ratio
+        beamLoMagDiffX = beamHiMagDiffX * hiMagCal/loMagCal
+        beamLoMagDiffY = beamHiMagDiffY * hiMagCal/loMagCal
+        
+        # Correct Mag 1 (cam_7 ROI2)
+        cam_7.roi2.min_xyz.min_x.put(cam_7.roi2.min_xyz.min_x.get() + beamLoMagDiffX)
+        cam_7.roi2.min_xyz.min_y.put(cam_7.roi2.min_xyz.min_y.get() + beamLoMagDiffY)
+        
+        # Correct Mag 2 (cam_7 ROI3)
+        cam_7.roi3.min_xyz.min_x.put(cam_7.roi3.min_xyz.min_x.get() + beamLoMagDiffX)
+        cam_7.roi3.min_xyz.min_y.put(cam_7.roi3.min_xyz.min_y.get() + beamLoMagDiffY)
+        
+        time.sleep(3)
+        
+        # Adjust Gonio Y so rotation axis is again aligned to beam
+        gonioYDiff = beamHiMagDiffY * hiMagCal
+        posGyOld = govPositionGet('gy', 'Work')
+        posGyNew = posGyOld + gonioYDiff
+        yield from bps.mv(gonio.gy, posGyNew)   # Move Gonio Y to new position
+        govPositionSet(posGyNew, 'gy', 'Work')  # Set Governor Gonio Y Work position to new value
+        print('Gonio Y difference = %.3f' % gonioYDiff)
+            
     yield from bps.mv(shutter_bcu.close, 1)
     print('BCU Shutter Closed')
     
     # Transition to Governor state SA (Sample Alignment)
     govStateSet('SA')
-    
-    # Adjust Gonio Y so rotation axis is again aligned to beam
-    gonioYDiff = beamHiMagDiffY * hiMagCal
-    posGyOld = govPositionGet('gy', 'Work')
-    posGyNew = posGyOld + gonioYDiff
-    yield from bps.mv(gonio.gy, posGyNew)   # Move Gonio Y to new position
-    govPositionSet(posGyNew, 'gy', 'Work')  # Set Governor Gonio Y Work position to new value
-    print('Gonio Y difference = %.3f' % gonioYDiff)
     
     # Set previous beam transmission
     if transSet != 'None':
