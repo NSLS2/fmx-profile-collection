@@ -140,6 +140,7 @@ def beam_center_align(transSet='All'):
     RE(beam_center_align(transSet='RI'))
     """
     # TODO:
+    #  * Consider running with BCU attenuators only
     #  * Check for Vis screen actuators out
     #  * Check for C-hutch shutter open
     #  * Check for ROI2 exceeding camera border.

@@ -255,7 +255,7 @@ def xf_bragg2e(t, h=1, k=1, l=1, LN=0):
     if LN: LN=1
     tt = t*np.pi/180 if t > 1 else t
     
-    d0 = 2*5.43102*(1-2.4e-4*LN)/np.sqrt(h^2+k^2+l^2)
+    d0 = 2*5.43102*(1-2.4e-4*LN)/np.sqrt(h**2+k**2+l**2)
     E = 12398.42/(d0*np.sin(tt))
     
     return E
@@ -273,7 +273,7 @@ def xf_e2bragg(E, h=1, k=1, l=1):
     
     if E<100: E=E*1e3
     
-    d0 = 2*5.43102/np.sqrt(h^2+k^2+l^2)
+    d0 = 2*5.43102/np.sqrt(h**2+k**2+l**2)
     t = np.arcsin(12398.42/d0/E) * 180/np.pi;
     
     return t
