@@ -52,28 +52,6 @@ def help_fmx():
     return
 
 
-def get_fluxKeithley():
-    """
-    Returns Keithley diode current derived flux.
-    """
-    
-    keithFlux = epics.caget('XF:17IDA-OP:FMX{Mono:DCM-dflux}')
-    
-    return keithFlux
-
-
-def set_fluxBeam(flux):
-    """
-    Sets the flux reference field.
-    
-    flux: Beamline flux at sample position for transmisison T = 1.  [ph/s]
-    """
-    
-    error = epics.caput('XF:17IDA-OP:FMX{Mono:DCM-dflux-M}', flux)
-    
-    return error
-
-
 def anneal(t=1.0):
     """
     Transitions Governor from SA to CB state and inserts annealer

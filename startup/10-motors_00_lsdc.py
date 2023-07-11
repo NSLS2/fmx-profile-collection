@@ -47,7 +47,7 @@ class HorizontalDCM(Device):
 	p = Cpt(EpicsMotor, '-Ax:P}Mtr', labels=['fmx'])
 	r = Cpt(EpicsMotor, '-Ax:R}Mtr', labels=['fmx'])
 	e = Cpt(EpicsMotor, '-Ax:E}Mtr', labels=['fmx'])
-	w = Cpt(EpicsMotor, '-Ax:W}Mtr', labels=['fmx'])
+#	w = Cpt(EpicsMotor, '-Ax:W}Mtr', labels=['fmx'])
 
 class VerticalDCM(Device):
     b = Cpt(EpicsMotor, '-Ax:B}Mtr')
@@ -97,6 +97,10 @@ hdcm = HorizontalDCM('XF:17IDA-OP:FMX{Mono:DCM', name='hdcm')
 
 # Vertical Double Crystal Monochromator (AMX)
 vdcm = VerticalDCM('XF:17IDA-OP:AMX{Mono:DCM', name='vdcm')
+
+# KB mirror pitch tweak voltages
+vkb_piezo_tweak = EpicsSignal('XF:17IDC-BI:FMX{Best:2}:PreDAC0:OutCh1')
+hkb_piezo_tweak = EpicsSignal('XF:17IDC-BI:FMX{Best:2}:PreDAC0:OutCh2')
 
 ## 17-ID-A FOE shutter
 shutter_foe = Shutter('XF:17ID-PPS:FAMX{Sh:FE}', name='shutter_foe',

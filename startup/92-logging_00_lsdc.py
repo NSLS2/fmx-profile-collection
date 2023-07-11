@@ -2,7 +2,21 @@
 
 import pandas as pd
 import datetime
+import epics
 import time
+
+# Global variable flux_df
+"""
+    flux_df: pandas DataFrame with fields
+        Slit 1 X gap [um]
+        Slit 1 Y gap [um]
+        Keithley current [A]
+        Keithley flux [ph/s]
+        BPM1 sum [A]
+        BPM4 sum [A]
+"""
+flux_df = None
+
 
 def log_fmx(msgStr):
     """
@@ -17,6 +31,61 @@ def log_fmx(msgStr):
     logStr = '{},{},'.format(time.strftime('%Y-%m-%d,%H:%M:%S'), time.time()) + msgStr + '\n'
     with open(LOG_FILENAME_FMX, "a") as myfile:
         myfile.write(logStr)
+
+
+def trans_set(transmission, trans = trans_bcu):
+    """
+    Sets the Attenuator transmission
+    """
+    
+    e_dcm = get_energy()
+    if e_dcm < 5000 or e_dcm > 30000:
+        print('Monochromator energy out of range. Must be within 5000 - 30000 eV. Exiting.')
+        return
+    
+    yield from bps.mv(trans.energy, e_dcm) # This energy PV is only used for debugging
+    yield from bps.mv(trans.transmission, transmission)
+    yield from bps.mv(trans.set_trans, 1)
+    
+    if trans == trans_bcu:
+        while atten_bcu.done.get() != 1:
+            time.sleep(0.5)
+    
+    print('Attenuator = ' + trans.name + ', Transmission set to %.3f' % trans.transmission.get())
+    return
+
+
+def trans_get(trans = trans_bcu):
+    """
+    Returns the Attenuator transmission
+    """
+    
+    transmission = trans.transmission.get()
+    
+    print('Attenuator = ' + trans.name + ', Transmission = %.3f' % transmission)
+    return transmission
+
+
+def get_fluxKeithley():
+    """
+    Returns Keithley diode current derived flux.
+    """
+    
+    keithFlux = epics.caget('XF:17IDA-OP:FMX{Mono:DCM-dflux}')
+    
+    return keithFlux
+
+
+def set_fluxBeam(flux):
+    """
+    Sets the flux reference field.
+    
+    flux: Beamline flux at sample position for transmisison T = 1.  [ph/s]
+    """
+    
+    error = epics.caput('XF:17IDA-OP:FMX{Mono:DCM-dflux-M}', flux)
+    
+    return error
 
 
 def slit1_flux_reference(flux_df,slit1Gap):
@@ -41,10 +110,8 @@ def slit1_flux_reference(flux_df,slit1Gap):
         BPM4 sum [A]
         
     """
-    
-    slits1.x_gap.move(slit1Gap)
-    slits1.y_gap.move(slit1Gap, wait=True)
-    time.sleep(1.0)
+    yield from bps.mv(slits1.x_gap, slit1Gap, slits1.y_gap, slit1Gap, wait=True)
+    time.sleep(2.0) # wait so the slits are definitely done moving and the Keithley reading is stable
     
     flux_df.at[slit1Gap, 'Slit 1 X gap [um]'] = slit1Gap
     flux_df.at[slit1Gap, 'Slit 1 Y gap [um]'] = slit1Gap
@@ -55,7 +122,7 @@ def slit1_flux_reference(flux_df,slit1Gap):
     flux_df.at[slit1Gap, 'BPM4 sum [A]'] = 0
     
 
-def fmx_flux_reference(slit1GapList = [2000, 1000, 600, 400], slit1GapDefault = 1000):
+def fmx_flux_reference(slit1GapList = [2000, 1000, 600, 400], slit1GapDefault = 1000, transSet='All'):
     """
     Sets Slit 1 X gap and Slit 1 Y gap to a list of settings,
     and returns flux reference values in a pandas DataFrame.
@@ -89,11 +156,24 @@ def fmx_flux_reference(slit1GapList = [2000, 1000, 600, 400], slit1GapDefault = 
         
     """
     
+    # Store current transmission, then set full transmission
+    if transSet != 'None':
+        if transSet in ['All', 'BCU']:
+            transOrgBCU = trans_get(trans=trans_bcu)
+        if transSet in ['All', 'RI']:
+            transOrgRI = trans_get(trans=trans_ri)
+            yield from trans_set(1.0, trans=trans_ri)
+        if transSet == 'BCU':
+            yield from trans_set(1.0, trans=trans_bcu)
+        if transSet == 'All':
+            yield from trans_set(1.0, trans=trans_bcu)
+            
     print(datetime.datetime.now())
     msgStr = "Energy = " + "%.1f" % get_energy() + " eV"
     print(msgStr)
     log_fmx(msgStr)
     
+    global flux_df
     flux_df = pd.DataFrame(columns=['Slit 1 X gap [um]',
                                     'Slit 1 Y gap [um]',
                                     'Keithley current [A]',
@@ -102,14 +182,23 @@ def fmx_flux_reference(slit1GapList = [2000, 1000, 600, 400], slit1GapDefault = 
                                     'BPM4 sum [A]',
                                    ])
     
+    # Put in diode
+    yield from bps.mv(light.y,govPositionGet('li', 'Diode'))
+    
+    # Retract gonio X by 200 um
+    yield from bps.mvr(gonio.gx, -200)
+    
+    # Open BCU shutter
+    yield from bps.mv(shutter_bcu.open, 1)
+    time.sleep(1)
+    
     for slit1Gap in slit1GapList:
-        slit1_flux_reference(flux_df,slit1Gap)
+        yield from slit1_flux_reference(flux_df,slit1Gap)
     
     # Move back to default slit width
     # TODO: save reference before and return to it later?
-    slits1.x_gap.move(slit1GapDefault)
-    slits1.y_gap.move(slit1GapDefault, wait=True)
-    time.sleep(1.0)
+    yield from bps.mv(slits1.x_gap, slit1GapDefault, slits1.y_gap, slit1GapDefault, wait=True)
+    time.sleep(2.0) # wait so the slits are definitely done moving and the Keithley reading is stable
 
     vFlux = get_fluxKeithley()
     set_fluxBeam(vFlux)
@@ -118,11 +207,26 @@ def fmx_flux_reference(slit1GapList = [2000, 1000, 600, 400], slit1GapDefault = 
     log_fmx(msgStr)
     
     # TEMP FIX: # BPM4 in repair 
-    # TEMP FIX: msgStr = 'BPM4 sum = {:.4g} A for Slit 1 gap = {:.1f} um'.format(bpm4.sum_all.get(), slit1GapDefault)
-    # TEMP FIX: print(msgStr)
-    # TEMP FIX: log_fmx(msgStr)
+    #msgStr = 'BPM4 sum = {:.4g} A for Slit 1 gap = {:.1f} um'.format(bpm4.sum_all.get(), slit1GapDefault)
+    #print(msgStr)
+    #log_fmx(msgStr)
     
-    return flux_df
+    # Close shutter
+    yield from bps.mv(shutter_bcu.close, 1)
+    
+    # Put back gonio X
+    yield from bps.mvr(gonio.gx, 200)
+    
+    # Retract diode
+    yield from bps.mv(light.y,govPositionGet('li', 'In'))
+    
+    # Set previous beam transmission
+    if transSet != 'None':
+        if transSet in ['All', 'RI']:
+            yield from trans_set(transOrgRI, trans=trans_ri)
+        if transSet in ['All', 'BCU']:
+            yield from trans_set(transOrgBCU, trans=trans_bcu)
+            
 
 
 def fmx_beamline_reference():
@@ -214,3 +318,43 @@ def fmx_beamline_reference():
     log_fmx(msgStr)
     
     return
+
+
+def fmx_reference(slit1GapDefault = 1000, transSet='All'):
+    """
+    Calls fmx_flux_reference, then fmx_beamline_reference.
+    setE will do the same after the beam alignment.
+   
+    Parameters
+    ----------
+    transSet: FMX only: Set to 'RI' if there is a problem with the BCU attenuator.
+              FMX only: Set to 'BCU' if there is a problem with the RI attenuator.
+              Set to 'None' if there are problems with all attenuators.
+              Operator then has to choose a flux by hand that will not saturate scinti
+              default = 'All'
+              
+    Examples
+    --------
+    fmx_reference()
+        
+    """
+    if not govStatusGet('SA'):
+        print('Not in Governor state SA, exiting')
+        return
+    
+    # Transition to Governor state BL
+    govStateSet('BL')
+    
+    RE(fmx_flux_reference(slit1GapDefault = slit1GapDefault, transSet = transSet))
+    
+    # Transition to Governor state SA
+    govStateSet('SA')
+    
+    fmx_beamline_reference()
+    
+    global flux_df
+    
+    return flux_df
+    
+    
+   

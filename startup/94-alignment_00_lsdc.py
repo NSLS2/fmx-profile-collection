@@ -59,39 +59,6 @@ def detectorCoverOpen():
     return
 
 
-def trans_set(transmission, trans = trans_bcu):
-    """
-    Sets the Attenuator transmission
-    """
-    
-    e_dcm = get_energy()
-    if e_dcm < 5000 or e_dcm > 30000:
-        print('Monochromator energy out of range. Must be within 5000 - 30000 eV. Exiting.')
-        return
-    
-    yield from bps.mv(trans.energy, e_dcm) # This energy PV is only used for debugging
-    yield from bps.mv(trans.transmission, transmission)
-    yield from bps.mv(trans.set_trans, 1)
-    
-    if trans == trans_bcu:
-        while atten_bcu.done.get() != 1:
-            time.sleep(0.5)
-    
-    print('Attenuator = ' + trans.name + ', Transmission set to %.3f' % trans.transmission.get())
-    return
-
-
-def trans_get(trans = trans_bcu):
-    """
-    Returns the Attenuator transmission
-    """
-    
-    transmission = trans.transmission.get()
-    
-    print('Attenuator = ' + trans.name + ', Transmission = %.3f' % transmission)
-    return transmission
-
-
 def transDefaultGet(energy):
     """
     Returns the default transmission to avoid saturation of the scintillator
@@ -198,7 +165,7 @@ def beam_center_align(transSet='All'):
     yield from bps.mv(light.y,govPositionGet('li', 'Out'))
     print('Light Y Out')
     
-    # TODO: use "yield from bps.mv(...)" instead of .put(...) below.
+    # TODO: use "yield from bps.mv(...)" instead of .put(...) below??!?
 
     # ROI1 centroid plugin does not work
     # Copy ROI1 geometry to ROI4 and use ROI4 centroid plugin
