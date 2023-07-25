@@ -8,6 +8,12 @@ import numpy as np
 import time
 import re
 import epics
+import glob
+
+from pathlib import Path
+
+
+save_dir = '/epics/iocs/notebook/notebooks/chip_fiducials'
 
 
 def configure_zebra_for_chip_scanner():
@@ -87,6 +93,8 @@ class ChipScanner(Device):
         
         self.lo_camera_ratios = (BL_calibration.LoMagCal.get(), BL_calibration.LoMagCal.get())
         self.hi_camera_ratios = (BL_calibration.HiMagCal.get(), BL_calibration.HiMagCal.get())
+        
+        self.filepath = None
                 
     def manual_set_fiducial(self, location):
         x_loc = self.x.get().user_readback
@@ -117,6 +125,10 @@ class ChipScanner(Device):
         fiducial-to-fiducial distance in each direction leaves the 
         fiducial in the camera image."""
         
+        if not (self.check_camera_settings(self.lo_camera) and self.check_camera_settings(self.hi_camera)):
+            print("Cancelling fiducial finding")
+            return(False)
+        
         successes = {'F0': False, 'F1': False, 'F2': False}
         locations = {'F0': (-self.F1_x/2, -self.F2_y/2), 
                      'F1': (self.F1_x/2, -self.F2_y/2),
@@ -133,13 +145,7 @@ class ChipScanner(Device):
                 setattr(self, f'{location}_enc', posns)
                 successes[location] = True
 
-        if all(value == True for value in successes.values()):
-            lx, ly, theta = self.calculate_fit()
-            if not (25300 < lx < 25500):
-                print(f"Horizontal distance between vectors {lx} appears to be off, please check.")
-            if not (25300 < ly < 25500):
-                print(f"Horizontal distance between vectors {ly} appears to be off, please check.")
-        elif (successes['F0'] + successes['F1'] + successes['F2'] == 2):
+        if (successes['F0'] + successes['F1'] + successes['F2'] == 2):
             fail_loc = list(successes.keys())[list(successes.values()).index(False)]
             yield from bps.mv(self.x, locations[fail_loc][0], self.y, locations[fail_loc][1])
             success = yield from self.find_center(fail_loc, center_high = True)
@@ -151,6 +157,16 @@ class ChipScanner(Device):
                 successes[fail_loc] = True
             else:
                 print(f"Fiducial at {fail_loc} failed to be found twice, set using manual_set_fiducial routine.")
+              
+        if all(value == True for value in successes.values()):
+            data_folder = Path(f"{save_dir}")
+            file_to_save = data_folder / f"fiducials_{int(time.time())}.txt"
+            self.save_fiducials(file_to_save)
+            lx, ly, theta = self.calculate_fit()
+            if not (25300 < lx < 25500):
+                print(f"Horizontal distance between vectors {lx} appears to be off (expected ~25400), please check.")
+            if not (25300 < ly < 25500):
+                print(f"Vertical distance between vectors {ly} appears to be off (expected ~25400), please check.")
         else:
             print("At least two fiducial detections failed, check output for details.")
     
@@ -167,6 +183,22 @@ class ChipScanner(Device):
     def get_fiducials(self):
         return self.F0, self.F1, self.F2, self.F0_enc, self.F1_enc, self.F2_enc
     
+    def save_fiducials(self, filepath):
+        with open(filepath, 'ab') as f:
+            for arr in self.get_fiducials():
+                np.save(f, arr)
+                
+    def load_fiducials(self, filepath):
+        to_load = ['F0', 'F1', 'F2', 'F0_enc', 'F1_enc', 'F2_enc']
+        with open(filepath, 'rb') as f:
+            for prop in to_load:
+                setattr(self, prop, np.load(f))
+                
+    def load_last_fiducials(self):
+        list_of_files = glob.glob(f'{save_dir}/*')
+        latest_file = max(list_of_files, key=os.path.getctime)
+        self.load_fiducials(latest_file)
+    
     def set_fiducials(self, F0, F1, F2, F0e, F1e, F2e):
         self.F0 = F0
         self.F1 = F1
@@ -179,6 +211,7 @@ class ChipScanner(Device):
         yield from self.find_camera_center(location, 'lo_camera')
         yield from self.find_camera_center(location, 'hi_camera', center = center_high)
         success, size = yield from autofocus(self.hi_camera, 'stats4_sigma_x', self.z, -100,100,15)
+        yield from self.find_camera_center(location, 'hi_camera', center = center_high)
         if success and (size>20):
             setattr(self, location+"_z_motor", self.z.get().user_readback)
             setattr(self, location+"_z_motor_enc", self.z.get().encoder_readback)
@@ -206,13 +239,18 @@ class ChipScanner(Device):
         roi_size = roi4_focus_size
         yield from bps.abs_set(camera.roi4.min_xyz.min_x, 0, wait=True)
         yield from bps.abs_set(camera.roi4.min_xyz.min_y, 0, wait=True)
-        yield from bps.abs_set(camera.roi4.size.x, x_size, wait=True)
+        yield from bps.abs_set(camera.roi4.size.x, 1692, wait=True)
         yield from bps.abs_set(camera.roi4.size.y, y_size, wait=True)
         yield from bps.sleep(0.2)
         
         max_x = camera.stats4.max_xy.x.get()
-        max_y = camera.stats4.max_xy.y.get()        
+        max_y = camera.stats4.max_xy.y.get()
+        
+        max_val = camera.stats4.max_value.get()
+        
         x_ratio, y_ratio = getattr(self, camera_st+'_ratios')
+        
+        print(max_x, max_y, max_val)
         
         zoom_roi_center_x = zoom_roi.min_xyz.min_x.get() + np.ceil(zoom_roi.size.x.get()/2)
         zoom_roi_center_y = zoom_roi.min_xyz.min_y.get() + np.ceil(zoom_roi.size.y.get()/2)
@@ -229,18 +267,21 @@ class ChipScanner(Device):
         dx_mot = MagCal * (max_x - roi_size/2 + center_x - zoom_roi_center_x)
         dy_mot = -MagCal * (max_y - roi_size/2 + center_y - zoom_roi_center_y)
         
-        setattr(self, location+"_x_motor", self.x.get().user_readback + dx_mot)
-        setattr(self, location+"_y_motor", self.y.get().user_readback + dy_mot)
+        yield from bps.mvr(self.x, dx_mot, self.y, dy_mot)
         
-        setattr(self, location+"_x_motor_enc", self.x.get().encoder_readback + dx_mot)
-        setattr(self, location+"_y_motor_enc", self.y.get().encoder_readback + dy_mot)
+        yield from bps.abs_set(camera.roi4.min_xyz.min_x, zoom_roi_center_x-roi_size/2, wait=True)
+        yield from bps.abs_set(camera.roi4.min_xyz.min_y, zoom_roi_center_y-roi_size/2, wait=True)
         
-        if center:
-            yield from bps.mvr(self.x, dx_mot, self.y, dy_mot)
-            yield from bps.abs_set(camera.roi4.min_xyz.min_x, zoom_roi_center_x-roi_size/2, wait=True)
-            yield from bps.abs_set(camera.roi4.min_xyz.min_y, zoom_roi_center_y-roi_size/2, wait=True)
-            yield from bps.sleep(0.2)
-
+        yield from bps.sleep(0.2)
+        
+        setattr(self, location+"_x_motor", self.x.get().user_readback)
+        setattr(self, location+"_y_motor", self.y.get().user_readback)
+        
+        setattr(self, location+"_x_motor_enc", self.x.get().encoder_readback)
+        setattr(self, location+"_y_motor_enc", self.y.get().encoder_readback)
+        
+        yield from bps.sleep(0.2)
+        
     def center_on_point(self):
         yield from bps.sleep(0.2)
         camera = self.hi_camera
@@ -261,6 +302,7 @@ class ChipScanner(Device):
         dx_mot =  MagCal * (center_x - roi_size/2)
         dy_mot =  -MagCal * (center_y - roi_size/2)
         yield from bps.mvr(self.x, dx_mot, self.y, dy_mot)
+        yield from bps.sleep(0.4)
         
         
     def name_to_fiducial_distances(self, location_name):
@@ -323,9 +365,15 @@ class ChipScanner(Device):
         yield from bps.mv(self.x, motor_loc[0], self.y, motor_loc[1], self.z, motor_loc[2])
     
     def configure_detector(self, location, triggers):
-        path = '/nsls2/data/fmx/proposals/commissioning/pass-312064/312064-20230706-fuchs/mx312064-1'
+        #path = '/nsls2/data/fmx/proposals/commissioning/pass-312064/312064-20230706-fuchs/mx312064-1'
+        if not self.filepath:
+            print(f'Must set filepath attribute for this chip scanner object before taking data, to determine location where the file will be saved.')
+            raise Exception('Filepath not found')
         eiger_single.cam.fw_num_images_per_file.put(triggers)
-        eiger_single.cam.file_path.put(path)
+        eiger_single.cam.file_path.put(self.filepath)
+        if not eiger_single.cam.file_path_exists.get():
+            print(f'Filepath {self.filepath} does not appear to be a valid directory recognized by the Eiger detector.')
+            raise Exception('Filepath not found')
         eiger_single.cam.num_images.put(triggers)
         eiger_single.cam.num_triggers.put(triggers)
         eiger_single.cam.trigger_mode.put(3)
@@ -333,9 +381,11 @@ class ChipScanner(Device):
         my_time = int(time.time())
         eiger_single.cam.fw_name_pattern.put(f'CHIP{location}{my_time}')
         dist = getDetectorDist(configStr = 'Chip_Scanner')
+        eiger_single.cam.omega_start.put(0)
+        eiger_single.cam.omega_incr.put(0)
         eiger_single.cam.det_distance.put(dist/1000)
     
-    def ppmac_linear_scan(self, location_start, location_start_enc, step_vector, step_vector_enc, wait_time, num_steps, start_offset = .01, location_offset = 0.0, location_offset_y = 0.0):
+    def ppmac_linear_scan(self, location_start, location_start_enc, step_vector, step_vector_enc, wait_time, num_steps, start_offset = .01, location_offset_x = 0.0, location_offset_y = 0.0):
         direction = np.sign(step_vector[0])
         zebra.pc.direction.put((1-direction)/2)
         zebra.pc.gate.width.put(abs(step_vector[0]/50.))
@@ -344,7 +394,7 @@ class ChipScanner(Device):
         zebra.pc.gate.start.put(location_start[0] - step_vector[0]*start_offset)
         l1 = location_start - step_vector
         
-        lse = location_start_enc - step_vector_enc*location_offset + np.array([0,1,0])*location_offset_y*100
+        lse = location_start_enc - step_vector_enc*location_offset_x + np.array([0,1,0])*location_offset_y*10000
         input_array = [[lse[0] + i*step_vector_enc[0], lse[1] + i*step_vector_enc[1]] for i in range(num_steps+1)]
         # input_array = [[location_start_enc[0] + i*step_vector_enc[0], location_start_enc[1] + i*step_vector_enc[1]] for i in range(num_steps+1)]        
         ppmac_channel.send_program(23, wait_time, 20, input_array)
@@ -368,11 +418,15 @@ class ChipScanner(Device):
         status = SubscriptionStatus(zebra.pc.arm.output, check_done)
         return status
 
-    def ppmac_single_line_scan(self, line, wait_time, zebra_offset = 0.01, location_offset = 0.0, location_offset_y = 0.0, refocus = False):
+    def ppmac_single_line_scan(self, line, wait_time, zebra_offset = 0.01, location_offset_x = 0.0, location_offset_y = 0.0, refocus = False):
         pattern = re.compile("^([A-H][1-8][a-t])$")
         if not pattern.match(line):
             print(f"Line scan requires input of form ex. A1a, got {line}.")
+            return(False)
         self.configure_detector(line, 20)
+        if zebra.pc.gate.sel.get():
+            print("Zebra appears to be configured for gonio1, run configure_zebra_for_chip_scanner() and retry.")
+            return(False)
         a0 = self.name_to_fiducial_distances('A1aa')
         ax = self.name_to_fiducial_distances('A1ab')
         ay = self.name_to_fiducial_distances('A1ba')
@@ -383,11 +437,11 @@ class ChipScanner(Device):
         yield from self.drive_to_location(f'{line}a')
         yield from self.center_on_point()
         if refocus:
-            yield from autofocus(self.hi_camera, 'stats4_sigma_x', self.z, -100,100,15)
+            yield from autofocus(self.hi_camera, 'stats4_sigma_x', self.z, -10,10,15)
         loc = np.array([self.x.get().user_readback, self.y.get().user_readback, self.z.get().user_readback])
         enc_loc = np.array([self.x.get().encoder_readback, self.y.get().encoder_readback, self.z.get().encoder_readback])
         govStateSet('CD', configStr = 'Chip_Scanner')
-        status = yield from self.ppmac_linear_scan(loc, enc_loc, x_step, x_step_enc, wait_time, 20, start_offset = zebra_offset, location_offset = location_offset)
+        status = yield from self.ppmac_linear_scan(loc, enc_loc, x_step, x_step_enc, wait_time, 20, start_offset = zebra_offset + location_offset_x, location_offset_x = location_offset_x, location_offset_y = location_offset_y)
         between_time = wait_time * 20 + 400
         status.wait(between_time/1000. + 20)
         shutter_bcu.close.put(1)
@@ -402,11 +456,14 @@ class ChipScanner(Device):
         print(f"Detector distance = {getDetectorDist(configStr = 'Chip_Scanner')}")
         print(f"Data location = {eiger_single.cam.file_path.get()}{eiger_single.cam.fw_name_pattern.get()}")
         
-    def ppmac_neighbourhood_scan(self, neighbourhood, wait_time, zebra_offset = 0.01, location_offset = 0.0, location_offset_y = 0.0, refocus = False):
+    def ppmac_neighbourhood_scan(self, neighbourhood, wait_time, zebra_offset = 0.01, location_offset_x = 0.0, location_offset_y = 0.0, refocus = False):
         pattern = re.compile("^([A-H][1-8])$")
         if not pattern.match(neighbourhood):
             print(f"Neighbourhood scan requires input of form ex. A1, got {neighbourhood}.")
-        
+            return(False)
+        if zebra.pc.gate.sel.get():
+            print("Zebra appears to be configured for gonio1, run configure_zebra_for_chip_scanner() and retry.")
+            return(False)
         self.configure_detector(neighbourhood, 400)
         a0 = self.name_to_fiducial_distances('A1aa')
         ax = self.name_to_fiducial_distances('A1ab')
@@ -418,7 +475,7 @@ class ChipScanner(Device):
         yield from self.drive_to_location(f'{neighbourhood}aa')
         yield from self.center_on_point()
         if refocus:
-            yield from autofocus(self.hi_camera, 'stats4_sigma_x', self.z, -100,100,15)
+            yield from autofocus(self.hi_camera, 'stats4_sigma_x', self.z, -10,10,15)
         loc = np.array([self.x.get().user_readback, self.y.get().user_readback, self.z.get().user_readback])
         enc_loc = np.array([self.x.get().encoder_readback, self.y.get().encoder_readback, self.z.get().encoder_readback])
         between_time = wait_time * 20 + 400
@@ -427,14 +484,14 @@ class ChipScanner(Device):
             # Snake scan, initial going right
             start_loc = loc + 2*i*y_step
             start_enc_loc = enc_loc + 2*i*y_step_enc
-            status = yield from self.ppmac_linear_scan(start_loc, start_enc_loc, x_step, x_step_enc, wait_time, 20, start_offset = zebra_offset, location_offset = location_offset) # 20 to push the chip off the sample at the end
+            status = yield from self.ppmac_linear_scan(start_loc, start_enc_loc, x_step, x_step_enc, wait_time, 20, start_offset = zebra_offset + location_offset_x, location_offset_x = location_offset_x, location_offset_y = location_offset_y) # 20 to push the chip off the sample at the end
             status.wait(between_time/1000. + 20)
             shutter_bcu.close.put(1)
             
             # Going back left
             start_loc = start_loc + y_step + 19*x_step
             start_enc_loc = start_enc_loc + y_step_enc + 19*x_step_enc
-            status = yield from self.ppmac_linear_scan(start_loc, start_enc_loc, -x_step, -x_step_enc, wait_time, 20, start_offset = zebra_offset, location_offset = location_offset)
+            status = yield from self.ppmac_linear_scan(start_loc, start_enc_loc, -x_step, -x_step_enc, wait_time, 20, start_offset = zebra_offset + location_offset_x, location_offset_x = location_offset_x, location_offset_y = location_offset_y)
             status.wait(between_time/1000. + 20)
             shutter_bcu.close.put(1)
 
@@ -529,6 +586,18 @@ class ChipScanner(Device):
         for _ in range(num_steps):
             yield from bps.mvr(self.x, motor_d[0], self.y, motor_d[1], self.z, motor_d[2])
             yield from bps.sleep(wait_time)
+            
+    def check_camera_settings(self, camera):
+        if camera.cam.acquire_time.get() > 0.1:
+            print(f'{camera} acquireTime > 0.1, which could affect processing. Please reduce this to continue.')
+            return(False)
+        if camera.cam.image_mode.get() != 2:
+            print(f'{camera} not in continuous acquisition mode, please set this and retry.')
+            return(False)
+        if camera.cam.detector_state.get() != 1:
+            print(f'{camera} not acquiring, please start and retry.')
+            return(False)
+        return(True)
         
 
 class OxfordChip(ChipScanner):
@@ -629,21 +698,21 @@ def getDetectorDist(configStr = 'Robot'):
     
     return govMsg
 
-def multiple_chip_neighbourhoods(neighbourhood_list):
+def multiple_chip_neighbourhoods(neighbourhood_list, wait_time = 20):
     for neighbourhood in neighbourhood_list:
-        RE(chip_scanner.ppmac_neighbourhood_scan(neighbourhood, 20))
+        RE(chip_scanner.ppmac_neighbourhood_scan(neighbourhood, wait_time))
         
-def chip_line_of_blocks(line):
+def chip_line_of_blocks(line, wait_time = 20):
     neighbourhoods = []
     for i in range(1,9):
         neighbourhoods.append(f'{line}{i}')
-    multiple_neighbourhoods(neighbourhoods)
+    multiple_chip_neighbourhoods(neighbourhoods, wait_time = wait_time)
 
     
 letters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
-def chip_all_blocks():
+def chip_all_blocks(wait_time = 20):
     neighbourhoods = []
     for i in range(1,9):
         for letter in letters:
             neighbourhoods.append(f'{letter}{i}')
-    multiple_neighbourhoods(neighbourhoods)
+    multiple_neighbourhoods(neighbourhoods, wait_time = wait_time)
