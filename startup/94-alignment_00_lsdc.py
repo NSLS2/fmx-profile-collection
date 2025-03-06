@@ -160,6 +160,10 @@ def beam_center_align(transSet='All'):
         else:
             transOrgBCU = trans_get(trans=trans_bcu)
             yield from trans_set(transDefault, trans=trans_bcu)
+    
+    # Retract all CRLs, i.e. set beamsize to "not expanded"
+    # ToDo: write a "get_beamsize" to save current setting and restore later
+    set_beamsize('V0','H0')
             
     # Retract backlight
     yield from bps.mv(light.y,govPositionGet('li', 'Out'))

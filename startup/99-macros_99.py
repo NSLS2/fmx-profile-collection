@@ -16,22 +16,19 @@ def help_fmx():
     print("""
     FMX beamline functions:
     
+    anneal()        - Transitions Governor from SA to CB state and inserts annealer
     beam_center_align() - Align goniometer and LSDC beam center to current beam position
-    beam_center_fit()   - Fit beam center to line
-    center_pin()    - Center an alignment pin in Y
     dcm_rock()      - Scan DCM crystal 2 pitch to maximize flux on BPM1
     fmx_dose()      - Caluclate dose for a set of LSDC settings
-    fmx_beamline_reference()    - Print beamline reference values
-    fmx_flux_reference()    - Get flux reference for a list of Slit 1 gap settings
+    fmx_reference() - Get flux for a list of Slit 1 gap settings and print beamline reference values
     fmx_expTime_to_10MGy()  - Caluclate experiment time that delivers a dose of 10 MGy
     focus_scan()    - Take microscope images with changing focus
     get_energy()    - Return HDCM energy in eV
     get_fluxKeithley()  - Returns Keithley diode current derived flux
     ivu_gap_scan()  - Scan IVU21 gap against a BPM intensity signal and go to peak
     mirror_scan()   - Pencil beam scan of HFM and KB
-    rd3d_calc()     - Dose estimate with RADDOSE3D
+    rd3d_calc()     - Dose estimate with RADDOSE3D (fmx_dose() has less variables but easier to use)
     set_beamsize()  - CRL setting to expand beam
-    set_energy()    - Set undulator, HDCM, HFM and KB settings for a certain energy
     setE()          - Set all optics settings and align beam center for a certain energy
     set_fluxBeam()  - Sets the flux reference field
     set_influence() - Set HV power supply influence function voltage step
@@ -92,56 +89,6 @@ def anneal(t=1.0):
     govStateSet('SA')
     
     return
-
-
-def set_beamsize(sizeV, sizeH):
-    """
-    Sets Compound Refractive Lenses (CRL) to defocus the beam
-    
-    sizeV: Vertical expansion
-      'V0' no expansion
-      'V1': 1 V CRL, for a V beam size of ~10um
-      
-    sizeH: Horizontal expansion
-      'H0': no expansion
-      'H1': 2 H CRLs, for a H beam size of ~10um
-    
-    Examples
-    set_beamsize('V1','H1')
-    set_beamsize('V1','H0')
-    """
-    
-    if get_energy()<9000.0:
-        print('Warning: For energies < 9 keV, use KB mirrors to defocus, not CRLs')
-    
-    if sizeV == 'V0':
-        yield from bps.mv(transfocator.vs.mv_out, 1)
-        yield from bps.mv(transfocator.v2a.mv_out, 1)
-        yield from bps.mv(transfocator.v1a.mv_out, 1)
-        yield from bps.mv(transfocator.v1b.mv_out, 1)
-    elif sizeV == 'V1':
-        yield from bps.mv(transfocator.vs.mv_in, 1)
-        yield from bps.mv(transfocator.v2a.mv_out, 1)
-        yield from bps.mv(transfocator.v1a.mv_out, 1)
-        yield from bps.mv(transfocator.v1b.mv_in, 1)
-    else:
-        print("Error: Vertical size argument has to be \'V0\' or  \'V1\'")
-    
-    if sizeH == 'H0':
-        yield from bps.mv(transfocator.h4a.mv_out, 1)
-        yield from bps.mv(transfocator.h2a.mv_out, 1)
-        yield from bps.mv(transfocator.h1a.mv_out, 1)
-        yield from bps.mv(transfocator.h1b.mv_out, 1)
-    elif sizeH == 'H1':
-        yield from bps.mv(transfocator.h4a.mv_out, 1)
-        yield from bps.mv(transfocator.h2a.mv_in, 1)
-        yield from bps.mv(transfocator.h1a.mv_in, 1)
-        yield from bps.mv(transfocator.h1b.mv_in, 1)
-    else:
-        print("Error: Horizontal size argument has to be \'H0\' or  \'H1\'")
-    
-    return
-
 
 def set_influence(electrode, bimorph, bank):
     """

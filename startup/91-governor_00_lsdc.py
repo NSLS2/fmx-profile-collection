@@ -33,7 +33,7 @@ def govStatusGet(stateStr, configStr = 'Robot'):
     
     configStr: Governor configuration, 'Robot', 'Human', 'Chip_Scanner' or 'Hepath'. default: 'Robot'
     stateStr: Governor short version state. Example: 'SA' for sample alignment
-              one of ['M','SE','SA','DA','XF','BL','BS','AB','CB','DI','CE','CA','CD']
+              one of ['M','SE','SA','TA','DA','XF','BL','BS','AB','CB','DI','CE','CA','CD','PA']
 
     Examples
     govStatusGet('SA')
@@ -42,8 +42,8 @@ def govStatusGet(stateStr, configStr = 'Robot'):
     blStr = blStrGet()
     if blStr == -1: return -1
     
-    if stateStr not in ['M','SE','SA','DA','XF','BL','BS','AB','CB','DI','CE','CA','CD']:
-        print('stateStr must be one of: M,SE,SA,DA,XF,BL,BS,AB,CB,DI,CE,CA,CD]')
+    if stateStr not in ['M','SE','SA','TA','DA','XF','BL','BS','AB','CB','DI','CE','CA','CD','PA']:
+        print('stateStr must be one of: [M,SE,SA,TA,DA,XF,BL,BS,AB,CB,DI,CE,CA,CD,PA]')
         return -1
     
     sysStr = 'XF:17IDC-ES:' + blStr
@@ -61,7 +61,7 @@ def govStateSet(stateStr, configStr = 'Robot'):
 
     configStr: Governor configuration, 'Robot', 'Human', 'Chip_Scanner' or 'Hepath'. default: 'Robot'
     stateStr: Governor short version state. Example: 'SA' for sample alignment
-              one of ['M','SE','SA','DA','XF','BL','BS','AB','CB','DI','CE','CA','CD']
+              one of ['M','SE','SA','TA','DA','XF','BL','BS','AB','CB','DI','CE','CA','CD','PA']
 
     Examples:
     govStateSet('SA')
@@ -70,8 +70,8 @@ def govStateSet(stateStr, configStr = 'Robot'):
     blStr = blStrGet()
     if blStr == -1: return -1
 
-    if stateStr not in ['M','SE','SA','DA','XF','BL','BS','AB','CB','DI','CE','CA','CD']:
-        print('stateStr must be one of: M,SE,SA,DA,XF,BL,BS,AB,CB,DI,CE,CA,CD]')
+    if stateStr not in ['M','SE','SA','TA','DA','XF','BL','BS','AB','CB','DI','CE','CA','CD','PA']:
+        print('stateStr must be one of: M,SE,SA,TA,DA,XF,BL,BS,AB,CB,DI,CE,CA,CD,PA]')
         return -1
     
     sysStr = 'XF:17IDC-ES:' + blStr

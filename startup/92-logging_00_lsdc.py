@@ -185,8 +185,8 @@ def fmx_flux_reference(slit1GapList = [2000, 1000, 600, 400], slit1GapDefault = 
     # Put in diode
     yield from bps.mv(light.y,govPositionGet('li', 'Diode'))
     
-    # Retract gonio X by 200 um
-    yield from bps.mvr(gonio.gx, -200)
+    # Retract gonio X by 10 mm
+    yield from bps.mvr(gonio.gx, -10000)
     
     # Open BCU shutter
     yield from bps.mv(shutter_bcu.open, 1)
@@ -211,11 +211,13 @@ def fmx_flux_reference(slit1GapList = [2000, 1000, 600, 400], slit1GapDefault = 
     #print(msgStr)
     #log_fmx(msgStr)
     
+    display(flux_df)
+    
     # Close shutter
     yield from bps.mv(shutter_bcu.close, 1)
     
     # Put back gonio X
-    yield from bps.mvr(gonio.gx, 200)
+    yield from bps.mvr(gonio.gx, 10000)
     
     # Retract diode
     yield from bps.mv(light.y,govPositionGet('li', 'In'))
@@ -289,17 +291,17 @@ def fmx_beamline_reference():
     print(msgStr)
     log_fmx(msgStr)
 
-    msgStr = "VKB tweak voltage = " + "%.3f" % vkb_piezo_tweak.get() + " V"
-    print(msgStr)
-    log_fmx(msgStr)
+    #msgStr = "VKB tweak voltage = " + "%.3f" % vkb_piezo_tweak.get() + " V"
+    #print(msgStr)
+    #log_fmx(msgStr)
     
     msgStr = "VKB pitch = " + "%.4f" % kbm.vp.user_readback.get() + " urad"
     print(msgStr)
     log_fmx(msgStr)
 
-    msgStr = "HKB tweak voltage = " + "%.3f" % hkb_piezo_tweak.get() + " V"
-    print(msgStr)
-    log_fmx(msgStr)
+    #msgStr = "HKB tweak voltage = " + "%.3f" % hkb_piezo_tweak.get() + " V"
+    #print(msgStr)
+    #log_fmx(msgStr)
     
     msgStr = "HKB pitch = " + "%.4f" % kbm.hp.user_readback.get() + " urad"
     print(msgStr)
@@ -356,5 +358,75 @@ def fmx_reference(slit1GapDefault = 1000, transSet='All'):
     
     return flux_df
     
+    
+def fmx_flux_reference_legacy(slit1GapList = [2000, 1000, 600, 400], slit1GapDefault = 1000):
+    """
+    Sets Slit 1 X gap and Slit 1 Y gap to a list of settings,
+    and returns flux reference values in a pandas DataFrame.
+    
+    Parameters
+    ----------
+    
+    slit1GapList: float (default=[2000, 1000, 600, 400])
+        A list of gap values [um] for Slit 1 X and Y
+    slit1GapDefault: Gap value [um] to set as default after getting references
+        Default slit1GapDefault = 1000
+    
+    Returns
+    -------
+    
+    flux_df: pandas DataFrame with fields
+        Slit 1 X gap [um]
+        Slit 1 Y gap [um]
+        Keithley current [A]
+        Keithley flux [ph/s]
+        BPM1 sum [A]
+        BPM4 sum [A]
+        
+    Examples
+    --------
+    fmx_flux_reference()
+    flux_df=fmx_flux_reference()
+    flux_df
+    fmx_flux_reference(slit1GapList = [2000, 1500, 1000])
+    fmx_flux_reference(slit1GapList = [2000, 1500, 1000], slit1GapDefault = 600)
+        
+    """
+    
+    print(datetime.datetime.now())
+    msgStr = "Energy = " + "%.1f" % get_energy() + " eV"
+    print(msgStr)
+    log_fmx(msgStr)
+    
+    flux_df = pd.DataFrame(columns=['Slit 1 X gap [um]',
+                                    'Slit 1 Y gap [um]',
+                                    'Keithley current [A]',
+                                    'Keithley flux [ph/s]',
+                                    'BPM1 sum [A]',
+                                    'BPM4 sum [A]',
+                                   ])
+    
+    for slit1Gap in slit1GapList:
+        slit1_flux_reference_legacy(flux_df,slit1Gap)
+    
+    # Move back to default slit width
+    # TODO: save reference before and return to it later?
+    slits1.x_gap.move(slit1GapDefault)
+    slits1.y_gap.move(slit1GapDefault, wait=True)
+    time.sleep(1.0)
+
+    vFlux = get_fluxKeithley()
+    set_fluxBeam(vFlux)
+    msgStr = "Reference flux for Slit 1 gap = " + "%d" % slit1GapDefault + " um for T=1 set to " + "%.1e" % vFlux + " ph/s"
+    print(msgStr)
+    log_fmx(msgStr)
+    
+    # TEMP FIX: # BPM4 in repair 
+    # TEMP FIX: msgStr = 'BPM4 sum = {:.4g} A for Slit 1 gap = {:.1f} um'.format(bpm4.sum_all.get(), slit1GapDefault)
+    # TEMP FIX: print(msgStr)
+    # TEMP FIX: log_fmx(msgStr)
+    
+    return flux_df
+
     
    

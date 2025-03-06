@@ -138,7 +138,7 @@ colli = XZXYMotor('XF:17IDC-ES:FMX{Colli:1', name='colli')
 
 ## Microscope
 mic = XYMotor('XF:17IDC-ES:FMX{Mic:1', name='mic')
-light = YMotor('XF:17IDC-ES:FMX{Light:1', name='lightY')
+light = YMotor('XF:17IDC-ES:FMX{Light:1', name='light')
 
 ## Holey Mirror
 hm = XYZMotor('XF:17IDC-ES:FMX{Mir:1', name='hm')
