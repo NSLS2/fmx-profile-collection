@@ -1,4 +1,4 @@
- # Plans to align beam and goniometer for LSDC
+# Plans to align beam and goniometer for LSDC
 
 import epics
 import bluesky.preprocessors as bpp

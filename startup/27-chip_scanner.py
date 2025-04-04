@@ -229,7 +229,7 @@ class ChipScanner(Device):
             setattr(self, f'F{i}', getattr(self,f'f{i}t'))
             setattr(self, f'F{i}_enc', getattr(self, f'f{i}t_enc'))
             
-    def use_as_fiducial(self, location):
+    def use_as_fiducial(self, location, limit=100):
         chip_x, chip_y = self.name_to_fiducial_distances(location)
         motor_loc = self.fiducial_distances_to_location(chip_x, chip_y)
 
@@ -240,8 +240,9 @@ class ChipScanner(Device):
         x_loc_enc = self.x.get().encoder_readback
         y_loc_enc = self.y.get().encoder_readback
         z_loc_enc = self.z.get().encoder_readback
-
-        if not np.linalg.norm(np.array([x_loc, y_loc, z_loc]) - motor_loc) < 50:
+        
+        ### UGLY HACK by Martin: Up limit from 50 to 150 um
+        if not np.linalg.norm(np.array([x_loc, y_loc, z_loc]) - motor_loc) < limit:
             print("Current location is outside of allowed region for correction, please redo the manual_set_fiducial routine and retry.")
             return False
 
@@ -465,7 +466,11 @@ class ChipScanner(Device):
         eiger_single.cam.omega_start.put(0)
         eiger_single.cam.omega_incr.put(0)
         eiger_single.cam.det_distance.put(dist/1000)
+        def check_armed(*, old_value, value, **kwargs):
+            return(old_value == 0 and value == 1)
+        status = SubscriptionStatus(eiger_single.cam.acquire, check_armed)
         eiger_single.cam.acquire.put(1)
+        return status
 
     def pre_line_scan_setup(self, location, n_images, acquisition_time = 10, refocus = False, recenter = True, expose_to_beam=True, transition_before=True):
         self.configure_zebra_for_hare()
@@ -478,12 +483,13 @@ class ChipScanner(Device):
         enc_loc = np.array([self.x.get().encoder_readback, self.y.get().encoder_readback])
         return(enc_loc)
         
-    def scan_and_cleanup(self, xl, yl, dwell_list, dl, cl, enc_loc, expose_to_beam=True, transition_before=True, transition_after=True):
+    def scan_and_cleanup(self, xl, yl, dwell_list, dl, cl, enc_loc, expose_to_beam=True, transition_before=True, transition_after=True, detector_status = None):
         ppmac_channel.create_program_from_points(23, 10, xl, yl, dwell_list, dl, cl, enc_loc, self.F1_enc - self.F0_enc, self.F2_enc - self.F0_enc) ############ Might need a sleep here, let's try without first though
         if transition_before:
             govStateSet('CD', configStr = 'Chip_Scanner')
         if expose_to_beam:
             shutter_bcu.open.put(1)
+        detector_status.wait(10)
         ppmac_channel.run_program(23)
         endpoint = ppmac_channel.end.get()
         while True:
@@ -493,30 +499,34 @@ class ChipScanner(Device):
                 break
             sleep(1)
         shutter_bcu.close.put(1)
+        def check_eiger_disarmed(*, old_value, value, **kwargs):
+            return(old_value == 1 and value == 0)
+        status = SubscriptionStatus(eiger_single.cam.acquire, check_eiger_disarmed)
         eiger_single.cam.acquire.put(0)
         if transition_after:
             govStateSet('CA', configStr = 'Chip_Scanner')
+        status.wait(10)
 
     def line_scan(self, line, acquisition_time = 10, location_offset_x = 0.0, location_offset_y = 0.0, refocus = False, recenter = True, expose_to_beam=True, transition_before=True, transition_after=True):
         pattern = re.compile("^([A-H][1-8][a-t])$")
         if not pattern.match(line):
             print(f"Hare scan requires input of form ex. A1d, got {line}. ")
             return(False)
-        self.configure_detector(line, 20, acquisition_time = acquisition_time/1000)
+        detector_status = self.configure_detector(line, 20, acquisition_time = acquisition_time/1000)
         enc_loc = yield from self.pre_line_scan_setup(line+"a", 20, acquisition_time = acquisition_time, refocus = refocus, recenter = recenter, expose_to_beam=expose_to_beam, transition_before=transition_before)
         xl = list(range(-1,21))
         yl = [0]*22
         dl = [0]*22
         cl = [0] + [1]*20 + [0]
         dwell_list = [acquisition_time]*22
-        self.scan_and_cleanup(xl, yl, dwell_list, dl, cl, enc_loc, expose_to_beam=expose_to_beam, transition_before=transition_before, transition_after=transition_after)
+        self.scan_and_cleanup(xl, yl, dwell_list, dl, cl, enc_loc, expose_to_beam=expose_to_beam, transition_before=transition_before, transition_after=transition_after, detector_status=detector_status)
 
     def neighbourhood_scan(self, neighbourhood, acquisition_time = 10, location_offset_x = 0.0, location_offset_y = 0.0, refocus = False, recenter = True, expose_to_beam=True, transition_before=True, transition_after=True):
         pattern = re.compile("^([A-H][1-8])$")
         if not pattern.match(neighbourhood):
             print(f"Hare scan requires input of form ex. A1, got {neighbourhood}.")
             return(False)
-        self.configure_detector(neighbourhood, 400, acquisition_time = acquisition_time/1000)
+        detector_status = self.configure_detector(neighbourhood, 400, acquisition_time = acquisition_time/1000)
         enc_loc = yield from self.pre_line_scan_setup(neighbourhood+"aa", 400, acquisition_time = acquisition_time, refocus = refocus, recenter = recenter, expose_to_beam=expose_to_beam, transition_before=transition_before)
         xl = []
         yl = []
@@ -535,7 +545,7 @@ class ChipScanner(Device):
             dl = dl + [0]*22
             cl = cl + [0] + [1]*20 + [0]
             dwell_list = dwell_list + [acquisition_time]*22
-        self.scan_and_cleanup(xl, yl, dwell_list, dl, cl, enc_loc, expose_to_beam=expose_to_beam, transition_before=transition_before, transition_after=transition_after)
+        self.scan_and_cleanup(xl, yl, dwell_list, dl, cl, enc_loc, expose_to_beam=expose_to_beam, transition_before=transition_before, transition_after=transition_after, detector_status=detector_status)
 
     def calculate_hare(self, drop_to_det_time, droplet_offset_value = 0, acquisition_time = 10, post_drop_dwell_min_time = 10):
         if not post_drop_dwell_min_time >= acquisition_time:
@@ -564,7 +574,7 @@ class ChipScanner(Device):
         if not pattern.match(line):
             print(f"Hare scan requires input of form ex. A1d, got {line}.")
             return(False)
-        self.configure_detector(line, 20, acquisition_time = acquisition_time/1000)
+        detector_status = self.configure_detector(line, 20, acquisition_time = acquisition_time/1000)
         enc_loc = yield from self.pre_line_scan_setup(line+"a", 20, acquisition_time = acquisition_time, refocus = refocus, recenter = recenter, expose_to_beam=expose_to_beam, transition_before=transition_before)
         well_move_time, steps_ahead, pdd = yield from self.calculate_hare(drop_to_det_time, droplet_offset_value = droplet_offset_value, acquisition_time = acquisition_time, post_drop_dwell_min_time = post_drop_dwell_min_time)
         n_scans, remains = divmod(20, steps_ahead)
@@ -593,7 +603,7 @@ class ChipScanner(Device):
                 dl = dl + [1]*remains + [0] + [0]*remains
                 cl = cl + [0]*remains + [0] + [1]*remains
                 dwell_list = dwell_list + [pdd]*remains + [int(drop_to_det_time - well_move_time*2*(remains-1) - pdd*remains)] + [pdd]*remains
-        self.scan_and_cleanup(xl, yl, dwell_list, dl, cl, enc_loc, expose_to_beam=expose_to_beam, transition_before=transition_before, transition_after=transition_after)
+        self.scan_and_cleanup(xl, yl, dwell_list, dl, cl, enc_loc, expose_to_beam=expose_to_beam, transition_before=transition_before, transition_after=transition_after, detector_status=detector_status)
 
     def neighbourhood_scan_hare(self, neighbourhood, drop_to_det_time, droplet_offset_value = 0, acquisition_time = 10, post_drop_dwell_min_time = 10, location_offset_x = 0.0, location_offset_y = 0.0, refocus = False, recenter = True, expose_to_beam=True, transition_before=True, transition_after=True):
         ''' drop_to_det_time = pump-probe-delay'''
@@ -601,7 +611,7 @@ class ChipScanner(Device):
         if not pattern.match(neighbourhood):
             print(f"Hare scan requires input of form ex. A1, got {neighbourhood}.")
             return(False)
-        self.configure_detector(neighbourhood, 400, acquisition_time = acquisition_time/1000)
+        detector_status = self.configure_detector(neighbourhood, 400, acquisition_time = acquisition_time/1000)
         enc_loc = yield from self.pre_line_scan_setup(neighbourhood+"aa", 400, acquisition_time = acquisition_time, refocus = refocus, recenter = recenter, expose_to_beam=expose_to_beam, transition_before=transition_before)
         well_move_time, steps_ahead, pdd = yield from self.calculate_hare(drop_to_det_time, droplet_offset_value = droplet_offset_value, acquisition_time = acquisition_time, post_drop_dwell_min_time = post_drop_dwell_min_time)
         n_scans, remains = divmod(20, steps_ahead)
@@ -632,7 +642,7 @@ class ChipScanner(Device):
                     dl = dl + [1]*remains + [0] + [0]*remains
                     cl = cl + [0]*remains + [0] + [1]*remains
                     dwell_list = dwell_list + [pdd]*remains + [int(drop_to_det_time - well_move_time*2*(remains-1) - pdd*remains)] + [pdd]*remains
-        self.scan_and_cleanup(xl, yl, dwell_list, dl, cl, enc_loc, expose_to_beam=expose_to_beam, transition_before=transition_before, transition_after=transition_after)
+        self.scan_and_cleanup(xl, yl, dwell_list, dl, cl, enc_loc, expose_to_beam=expose_to_beam, transition_before=transition_before, transition_after=transition_after, detector_status=detector_status)
 
     def configure_zebra_for_hare(self):
         epics.caput("XF:17IDC-ES:FMX{Zeb:3}:OUT1_TTL", 7)
