@@ -38,7 +38,7 @@ for camera in all_standard_pros:
     camera.stats1.read_attrs = ['total', 'centroid']
     camera.stats2.read_attrs = ['total', 'centroid']
     camera.stats3.read_attrs = ['total', 'centroid']
-    camera.stats4.read_attrs = ['total', 'centroid']
+    camera.stats4.read_attrs = ['total', 'centroid', 'sigma_x', 'sigma_y']
     camera.stats5.read_attrs = ['total', 'centroid']
     camera.stats4.centroid.read_attrs = ['x', 'y']
     camera.tiff.read_attrs = []

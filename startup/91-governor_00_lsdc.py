@@ -31,9 +31,9 @@ def govStatusGet(stateStr, configStr = 'Robot'):
     """
     Returns the current active status for a Governor state
     
-    configStr: Governor configuration, 'Robot' or 'Human', default: 'Robot'
+    configStr: Governor configuration, 'Robot', 'Human', 'Chip_Scanner' or 'Hepath'. default: 'Robot'
     stateStr: Governor short version state. Example: 'SA' for sample alignment
-              one of ['M', 'SE', 'SA', 'DA', 'XF', 'BL', 'BS', 'AB', 'CB', 'DI']
+              one of ['M','SE','SA','TA','DA','XF','BL','BS','AB','CB','DI','CE','CA','CD','PA']
 
     Examples
     govStatusGet('SA')
@@ -42,8 +42,8 @@ def govStatusGet(stateStr, configStr = 'Robot'):
     blStr = blStrGet()
     if blStr == -1: return -1
     
-    if stateStr not in ['M', 'SE', 'SA', 'DA', 'XF', 'BL', 'BS', 'AB', 'CB', 'DI']:
-        print('stateStr must be one of: M, SE, SA, DA, XF, BL, BS, AB, CB, DI]')
+    if stateStr not in ['M','SE','SA','TA','DA','XF','BL','BS','AB','CB','DI','CE','CA','CD','PA']:
+        print('stateStr must be one of: [M,SE,SA,TA,DA,XF,BL,BS,AB,CB,DI,CE,CA,CD,PA]')
         return -1
     
     sysStr = 'XF:17IDC-ES:' + blStr
@@ -54,13 +54,14 @@ def govStatusGet(stateStr, configStr = 'Robot'):
     
     return govStatus
 
+
 def govStateSet(stateStr, configStr = 'Robot'):
     """
     Sets Governor state
 
-    configStr: Governor configuration, 'Robot' or 'Human', default: 'Robot'
+    configStr: Governor configuration, 'Robot', 'Human', 'Chip_Scanner' or 'Hepath'. default: 'Robot'
     stateStr: Governor short version state. Example: 'SA' for sample alignment
-              one of ['M', 'SE', 'SA', 'DA', 'XF', 'BL', 'BS', 'AB', 'CB', 'DI']
+              one of ['M','SE','SA','TA','DA','XF','BL','BS','AB','CB','DI','CE','CA','CD','PA']
 
     Examples:
     govStateSet('SA')
@@ -69,8 +70,8 @@ def govStateSet(stateStr, configStr = 'Robot'):
     blStr = blStrGet()
     if blStr == -1: return -1
 
-    if stateStr not in ['M', 'SE', 'SA', 'DA', 'XF', 'BL', 'BS', 'AB', 'CB', 'DI']:
-        print('stateStr must be one of: M, SE, SA, DA, XF, BL, BS, AB, CB, DI]')
+    if stateStr not in ['M','SE','SA','TA','DA','XF','BL','BS','AB','CB','DI','CE','CA','CD','PA']:
+        print('stateStr must be one of: M,SE,SA,TA,DA,XF,BL,BS,AB,CB,DI,CE,CA,CD,PA]')
         return -1
     
     sysStr = 'XF:17IDC-ES:' + blStr
@@ -139,3 +140,28 @@ def govPositionGet(positionerStr, positionTypeStr, configStr = 'Robot'):
     
     return position
 
+
+def govConfigSet(configStr):
+    """
+    Sets Governor Configuration
+
+    configStr: Governor configuration, 'Robot', 'Human', 'Chip_Scanner', or 'Hepath'. default: 'Robot'
+    
+    Examples:
+    govConfigSet('Chip_Scanner')
+    """
+    
+    if configStr not in ['Robot','Human','Chip_Scanner','He_Path']:
+        print('configStr must be one of: Robot,Human,Chip_Scanner,He_Path]')
+        return -1
+    
+    blStr = blStrGet()
+    if blStr == -1: return -1
+
+    sysStr = 'XF:17IDC-ES:' + blStr
+    devStr = '{Gov}'
+    cmdStr = 'Config-Sel'
+    pvStr = sysStr + devStr + cmdStr
+    epics.caput(pvStr, configStr)
+    
+    return

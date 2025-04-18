@@ -18,14 +18,34 @@ def simple_ascan(camera, stats, motor, start, end, steps):
             motor_name = motor.gap.name
         except AttributeError:
             motor_name = motor.name
+    
+    # Setup plots
+    fig, ax1 = plt.subplots()
+    ax1.grid(True)
 
-    #@bpp.subs_decorator([LivePlot(stats_name, motor_name), LiveTable([motor_name, stats_name])])
+    # Best-Effort Callback table will interfere with LiveTable
+    # Check if set, if yes store current setting, disable for scan, reset at end
+    try:
+        bec
+    except NameError:
+        bec_exists = False
+    else:
+        bec_exists = True
+        bec_table_enabled = bec._table_enabled
+        bec.disable_table()
+        
+    @bpp.subs_decorator(LivePlot(stats_name, motor_name, ax=ax1))
+    @bpp.subs_decorator(LiveTable([motor_name, stats_name]))
     @bpp.reset_positions_decorator([motor])
     def inner():
         yield from bp.scan([camera], motor, start, end, steps)
 
     yield from inner()
-
+    
+    # Reset Best-Effort Callback table settings to previous settings
+    if bec_exists and bec_table_enabled:
+        bec.enable_table()
+        
 
 def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None, filepath=None, filename=None):
     """Scans a slit aperture center over a mirror against a camera

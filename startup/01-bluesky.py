@@ -2,6 +2,7 @@ import nslsii
 
 BEAMLINE_ID = 'fmx'
 
+## 20250107 Test startup issues
 # nslsii.configure_base(get_ipython().user_ns, BEAMLINE_ID)
 nslsii.configure_base(get_ipython().user_ns, BEAMLINE_ID, pbar=False,
                       publish_documents_with_kafka=True) # Progress bar for scans
