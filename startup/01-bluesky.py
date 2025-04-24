@@ -1,5 +1,5 @@
 logger = logging.getLogger(__name__)
-logging.basicConfig(filename='/epics/iocs/notebook/startup_log.log', level=logging.INFO)
+logging.basicConfig(filename='/nsls2/data/fmx/shared/config/bluesky/logs/startup_log.log', level=logging.INFO)
 import nslsii
 import redis
 from redis_json_dict import RedisJSONDict
