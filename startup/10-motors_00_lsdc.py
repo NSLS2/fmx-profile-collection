@@ -94,6 +94,7 @@ class Annealer(Device):
 
 ## Horizontal Double Crystal Monochromator (FMX)
 hdcm = HorizontalDCM('XF:17IDA-OP:FMX{Mono:DCM', name='hdcm')
+hdcm.p.settle_time=.2
 
 # Vertical Double Crystal Monochromator (AMX)
 vdcm = VerticalDCM('XF:17IDA-OP:AMX{Mono:DCM', name='vdcm')
