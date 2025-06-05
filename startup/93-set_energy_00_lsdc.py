@@ -30,7 +30,7 @@ def find_peak(det, mot, start, stop, steps):
     else:
         m = mot
     print(f"Found peak for {m.name} at {peak_x} {m.egu} [BPM reading {peak_y}]")
-    return peak_x, peak_y
+    return peak_x, peak_y, data
 
 # TODO Use blStrGet()
 LUT_fmt = "XF:17ID-ES:FMX{{Misc-LUT:{}}}{}-Wfm"
@@ -205,9 +205,10 @@ def dcm_rock(dcm_p_range=0.03, dcm_p_points=51, logging=True, altDetector=False)
             det_name = detector.name
         mot_name = motor.name+'_user_setpoint'
 
-        @bpp.subs_decorator(LivePlot(det_name, mot_name, ax=ax))
+        #@bpp.subs_decorator(LivePlot(det_name, mot_name, ax=ax))
         def inner():
-            peak_x, peak_y = yield from find_peak(detector, motor, start, stop, num)
+            peak_x, peak_y, data = yield from find_peak(detector, motor, start, stop, num)
+            ax.plot(data[:, 1], data[:, 0])
             ax.plot([peak_x], [peak_y], 'or')
             return peak_x, peak_y
         return inner()
@@ -226,7 +227,8 @@ def dcm_rock(dcm_p_range=0.03, dcm_p_points=51, logging=True, altDetector=False)
             time.sleep(2.0)  # Range switching is slow
             print('Keithley current = {:.4g} A'.format(keithley.get()))
         
-    plt.close(fig)
+    #plt.close(fig)
+
     
 def ivu_gap_scan(start, end, steps, detector=bpm1, goToPeak=True):
     """
