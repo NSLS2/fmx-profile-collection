@@ -66,3 +66,6 @@ history*.sqlite
 
 .vscode
 startup/.vscode
+# pixi environments
+.pixi/*
+!.pixi/config.toml
