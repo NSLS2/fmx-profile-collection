@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 
 
+
 # Helper functions for set_energy and alignment
 
 def find_peak(det, mot, start, stop, steps):
@@ -271,9 +272,9 @@ def ivu_gap_scan(start, end, steps, detector=bpm1, goToPeak=True):
     LUT_offset = [epics.caget(LUT_fmt.format('ivu_gap_off', axis)) for axis in 'XY']
     
     # Setup plots
-    ax = plt.subplot(111)
-    ax.grid(True)
-    plt.tight_layout()
+    fig, ax2 = plt.subplots()
+    ax2.grid(True)
+    #plt.tight_layout()
 
     # Decorate find_peaks to play along with our plot and plot the peak location
     def find_peak_inner(detector, motor, start, stop, num, ax):
@@ -293,7 +294,7 @@ def ivu_gap_scan(start, end, steps, detector=bpm1, goToPeak=True):
 
         @bpp.subs_decorator(LivePlot(det_name, mot_name, ax=ax))
         def inner():
-            peak_x, peak_y = yield from find_peak(detector, motor, start, stop, num)
+            peak_x, peak_y, data = yield from find_peak(detector, motor, start, stop, num)
             ax.plot([peak_x], [peak_y], 'or')
             return peak_x, peak_y
         return inner()
@@ -305,7 +306,7 @@ def ivu_gap_scan(start, end, steps, detector=bpm1, goToPeak=True):
     yield from bps.mv(motor, start)
     
     # Scan IVU Gap
-    peak_x, peak_y = yield from find_peak_inner(detector, ivu_gap, 0, (end-start), steps, ax)
+    peak_x, peak_y = yield from find_peak_inner(detector, ivu_gap, 0, (end-start), steps, ax2)
     
     # Go to peak
     if goToPeak==True:
@@ -316,8 +317,8 @@ def ivu_gap_scan(start, end, steps, detector=bpm1, goToPeak=True):
         yield from bps.mv(ivu_gap, gapPreStart)
         print('Gap set to pre-scan value: %.1f' % gapPreStart + ' um')
     
-    plt.close()
-
+    #plt.close()
+    
     
 def setE(energy,
          dcm_p_range=0.03, dcm_p_points=51, altDetector=False,
