@@ -12,6 +12,8 @@ import glob
 import scipy
 import pickle
 import math
+import itertools
+
 
 from collections import namedtuple
 
@@ -659,6 +661,10 @@ class ChipScanner(Device):
                     dl = dl + [1]*remains + [0] + [0]*remains
                     cl = cl + [0]*remains + [0] + [1]*remains
                     dwell_list = dwell_list + [pdd]*remains + [int(drop_to_det_time - well_move_time*2*(remains-1) - pdd*remains)] + [pdd]*remains
+        s1 = [len(xl), len(yl), len(dl), len(cl), len(dwell_list)]
+        if not s1.count(s1[0])==len(s1):
+            print("Lists must be equal length, aborting run")
+            return(False)
         self.scan_and_cleanup(xl, yl, dwell_list, dl, cl, enc_loc, expose_to_beam=expose_to_beam, transition_before=transition_before, transition_after=transition_after, detector_status=detector_status, control_detector = control_detector)
 
     def multi_line_hare(self, neighbourhood, num_lines, droplet_offset_value = 0, acquisition_time = 10, post_drop_dwell_min_time = 10, location_offset_x = 0.0, location_offset_y = 0.0, refocus = False, recenter = False, expose_to_beam=True, transition_before=True, transition_after=True, control_detector = True):
@@ -741,27 +747,169 @@ class ChipScanner(Device):
         time.sleep(5)
         eiger_single.cam.acquire.put(0)
 
-    def single_move_time(self, start_location, end_location):
-        motor_speeds = np.array([epics.caget('XF:17IDC-ES:FMX{Chip:1-Ax:CX}Mtr.VELO'), epics.caget('XF:17IDC-ES:FMX{Chip:1-Ax:CY}Mtr.VELO')])
-        time = np.abs(end_location-start_location)/motor_speeds
-        return(time + acceleration_time/1000)
-        
-    def path_time(self, path, stop_times, pos_diff):
-        time = 0
-        for i in range(len(path) - 1):
-            time += self.single_move_time(path[i+1], path[i])
-        time += self.single_move_time(path[0], path[-1])
-        time += self.single_move_time(path[0]+pos_diff, path[0])
-        time += sum(stop_times)
-        return(time)
+#    def single_move_time(self, start_location, end_location):
+#        motor_speeds = np.array([epics.caget('XF:17IDC-ES:FMX{Chip:1-Ax:CX}Mtr.VELO'), epics.caget('XF:17IDC-ES:FMX{Chip:1-Ax:CY}Mtr.VELO')])
+#        time = np.abs(end_location-start_location)/motor_speeds
+#        return(max(time) + acceleration_time/1000)
+#        
+#    def path_time(self, path, stop_times, pos_diff):
+#        time = 0
+#        for i in range(len(path) - 1):
+#            time += self.single_move_time(path[i+1], path[i])
+#        time += self.single_move_time(path[0], path[-1])
+#        time += self.single_move_time(path[0]+pos_diff, path[0])
+#        time += sum(stop_times)
+#        return(time)
+#
+#    def rectangular_path_time(self, n_rows, n_columns, stop_times, pos_diff_cells = np.array([.5,.5])):
+#        path = []
+#        fxcell = (self.F1 - self.F0)/1016
+#        fycell = (self.F2 - self.F0)/1016
+#        Fmat = np.column_stack((fxcell, fycell))
+#        for i in range(n_rows):
+#            for j in range(n_columns):
+#                j2 = j if i%2==0 else (n_columns-j-1)
+#                d = (Fmat@np.array([j2,i]))[0:2]
+#                path.append(d)
+#        pos_diff = (Fmat@pos_diff_cells)[0:2]
+#        return(self.path_time(path, stop_times, pos_diff)
+#
+#    def find_optimal_path(self, delay_time, stop_time):
+#        def num_required(i,j):
+#            return np.ceil(20/i)*np.ceil(20/j)
 
-    #def rectangular_path(self, n_rows, n_columns):
-    #    path = []
-    #    for i in range(n_rows):
-    #        for i in range(n_columns):
-                
-            
+    def single_well_move_time(self):
+        fxcell = (self.F1 - self.F0)[0]/1016
+        fycell = (self.F2 - self.F0)[1]/1016
+        fcell = np.array([fxcell,fycell])
+        motor_speeds = np.array([epics.caget('XF:17IDC-ES:FMX{Chip:1-Ax:CX}Mtr.VELO'), epics.caget('XF:17IDC-ES:FMX{Chip:1-Ax:CY}Mtr.VELO')])
+        time = np.abs(fcell/motor_speeds)
+        return max(time)
         
+    def generate_time(self, i, j, td, tw, ta):
+        if i == j == 1:
+            return td + .5*tw
+        elif i == 1 and j == 2:
+            return j*td + (2*j - 5/2)*tw
+        elif i == 1:
+            return j*td + (2*j - 5/2)*tw + ta
+        elif j == 2:
+            return i*j*td + (i*(j+1)-5/2)*tw
+        elif i%2 == 0:
+            return i*j*td + (i*(j+1)-5/2)*tw + ta
+        elif i%2 == 1:
+            return i*j*td + (i*(j+1) + j - 7/2)*tw + 2*ta
+            
+    def determine_best_path(self, delay, td, tw, ta):
+        il = 20
+        jl = 20
+        nl = 100000
+        tout = 0
+        for i in range(1, 21):
+            for j in range(1, 21):
+                t1 = self.generate_time(i,j,td,tw,ta)
+                if t1 < delay:
+                    nt = np.ceil(20/i)*np.ceil(20/j)
+                    if nt < nl:
+                        il = i
+                        jl = j
+                        nl = nt
+                        tout = t1
+        return il, jl, nl, tout
+
+    def generate_path(self, xn, yn, drop_to_det_time, acq_time):
+        well_move_time = self.single_well_move_time()*1000
+        t1 = self.generate_time(xn, yn, acq_time + acceleration_time, well_move_time, acceleration_time)
+        if xn == yn == 1:
+            xr = np.array([-.5,0])
+            yr = np.array([-.5,0])
+            dr = np.array([1,0])
+            cr = np.array([0,1])
+            dwr = np.array([drop_to_det_time - t1, acq_time])
+        elif xn == 1 and yn == 2:
+            xr = np.array([-.5,.5,0,1])
+            yr = np.array([-.5,-.5,0,0])
+            dr = np.array([1,1,0,0])
+            cr = np.array([0,0,1,1])
+            dwr = np.array([acq_time, drop_to_det_time - t1, acq_time, acq_time])
+        elif xn == 1:
+            xr = np.array([i-.5 for i in range(yn)] + [.5] + [i for i in range(yn)])
+            yr = np.array([-.5]*(yn+1) + [1]*yn)
+            dr = np.array([1]*yn + [0]*(yn+1))
+            cr = np.array([0]*(yn+1) + [1]*yn)
+            dwr = np.array([acq_time]*yn + [drop_to_det_time-t1] + [acq_time]*yn)
+        elif xn == 2:
+            xr = np.array([i-.5 for i in range(yn)] + [yn - i - 1.5 for i in range(yn)] + [i for i in range(yn)] + [yn - i - 1 for i in range(yn)])
+            yr = np.array([-.5]*yn + [.5]*yn + [0]*yn + [1]*yn)
+            dr = np.array([1]*yn*2 + [0]*yn*2)
+            cr = np.array([0]*yn*2 + [1]*yn*2)
+            dwr = np.array([acq_time]*(yn*2-1) + [drop_to_det_time-t1] + [acq_time]*(yn*2))
+        elif xn%2 == 0:
+            xs = np.array([i for i in range(yn)] + [yn - i - 1 for i in range(yn)])
+            xr = np.concatenate([np.ravel([[xs-.5] for i in range(xn//2)]), np.array([-.5]), np.ravel([[xs] for i in range(xn//2)])])
+            yr = np.concatenate([np.ravel([[i-.5]*yn for i in range(xn)]), np.array([.5]), np.ravel([[i]*yn for i in range(xn)])])
+            dr = np.array([1]*xn*yn + [0] + [0]*xn*yn)
+            cr = np.array([0]*xn*yn + [0] + [1]*xn*yn)
+            dwr = np.array([acq_time]*xn*yn + [drop_to_det_time-t1] + [acq_time]*xn*yn)
+        else:
+            xs = np.array([i for i in range(yn)] + [yn - i - 1 for i in range(yn)])
+            xr = np.concatenate([np.ravel([[xs-.5] for i in range(xn//2)]), np.array([i-.5 for i in range(yn)]), np.array([-.5]*2), np.ravel([[xs] for i in range(xn//2)]), np.array([i for i in range(yn)])])
+            yr = np.concatenate([np.ravel([[i-.5]*yn for i in range(xn)]), np.array([xn-1.5, .5]), np.ravel([[i]*yn for i in range(xn)])])
+            dr = np.array([1]*xn*yn + [0]*2 + [0]*xn*yn)
+            cr = np.array([0]*xn*yn + [0]*2 + [1]*xn*yn)
+            dwr = np.array([acq_time]*xn*yn + [0] + [drop_to_det_time-t1] + [acq_time]*xn*yn)
+        dwr = np.ceil(dwr).astype(np.int64)
+        return xr, yr, dr, cr, dwr
+
+    def neighbourhood_scan_multi_line_hare(self, neighbourhood, drop_to_det_time, droplet_offset_value = 0, acquisition_time = 10, post_drop_dwell_min_time = 10, location_offset_x = 0.0, location_offset_y = 0.0, refocus = False, recenter = False, expose_to_beam=True, transition_before=True, transition_after=True, control_detector = True):
+        ''' drop_to_det_time = pump-probe-delay'''
+        pattern = re.compile("^([A-H][1-8])$")
+        if not pattern.match(neighbourhood):
+            print(f"Hare scan requires input of form ex. A1, got {neighbourhood}.")
+            return(False)
+        if control_detector:
+            detector_status = self.configure_detector(neighbourhood, 400, acquisition_time = acquisition_time/1000)
+        else:
+            detector_status = None
+        enc_loc = yield from self.pre_scan_setup(neighbourhood+"aa", 400, acquisition_time = acquisition_time, refocus = refocus, recenter = recenter, expose_to_beam=expose_to_beam, transition_before=transition_before)
+        acq_time = max(acquisition_time, post_drop_dwell_min_time)
+        path = yield from self.calculate_multi_line_hare(drop_to_det_time, post_drop_dwell_min_time = post_drop_dwell_min_time, droplet_offset_value = droplet_offset_value, acquisition_time = acq_time)
+        xl = []
+        yl = []
+        dl = [] 
+        cl = []
+        dwell_list = []
+        xmod, xrem = divmod(20, path[0])
+        ymod, yrem = divmod(20, path[1])
+        
+        xlengths = [path[0]]*xmod
+        if xrem != 0:
+            xlengths.append([xrem])
+        ylengths = [path[0]]*ymod
+        if yrem != 0:
+            ylengths.append([yrem])
+
+        for i,j in itertools.product(xlengths, ylengths):
+            xr, yr, dr, cr, dwr = self.generate_path(i, j, drop_to_det_time, acq_time)
+            xl.extend(xr)
+            yl.extend(yr)
+            dl.extend(dr)
+            cl.extend(cr)
+            dwell_list.extend(dwr)
+
+        self.scan_and_cleanup(xl, yl, dwell_list, dl, cl, enc_loc, expose_to_beam=expose_to_beam, transition_before=transition_before, transition_after=transition_after, detector_status=detector_status, control_detector = control_detector)
+
+    def calculate_multi_line_hare(self, drop_to_det_time, post_drop_dwell_min_time = 10, droplet_offset_value = 0, acquisition_time = 10):
+        well_move_time = self.single_well_move_time()*1000 # Convert to ms
+        min_time = well_move_time/2 + post_drop_dwell_min_time
+        if drop_to_det_time < min_time:
+            print(f'Minimum available time is {min_time} determined by the delay after the drop trigger prior to a move ({post_drop_dwell_min_time}) and the motor speed ({motor_speed} um/s).')
+            raise RuntimeError(f'Minimum available time is {min_time} determined by the delay after the drop trigger prior to a move ({post_drop_dwell_min_time}) and the motor speed ({motor_speed} um/s).')
+        td = acquisition_time + acceleration_time
+        path = self.determine_best_path(drop_to_det_time, td, well_move_time, acceleration_time)
+        yield from self.correct_droplet_offset(y_offset=-62.5+droplet_offset_value)
+        return path
+
 
 class OxfordChip(ChipScanner):
     def __init__(self, **kwargs):
