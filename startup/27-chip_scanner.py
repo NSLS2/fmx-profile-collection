@@ -29,20 +29,6 @@ Save_Objects = namedtuple('Save_Objects', ['fiducials', 'additional_fiducials', 
 acceleration_time = 5
 
 
-def configure_zebra_for_chip_scanner():
-    zebra.pc.encoder.put(0)
-    zebra.pc.arm.trig_source.put(0)
-    zebra.pc.gate.sel.put(0)
-    zebra.pc.pulse.sel.put(1)
-    zebra.pc.pulse.start.put(1)
-    zebra.pc.pulse.width.put(4)
-    zebra.pc.pulse.step.put(10)
-    zebra.pc.pulse.max.put(1)
-    epics.caput("XF:17IDC-ES:FMX{Zeb:3}:M1:MRES", 0.01)
-    time.sleep(0.5)
-    epics.caput("XF:17IDC-ES:FMX{Zeb:3}:M1:SETPOS.PROC", 1)
-
-
 class ppmac_input(Device):
     prog = Cpt(EpicsSignal, 'Program')
     dwell = Cpt(EpicsSignal, 'Dwell')
@@ -476,8 +462,8 @@ class ChipScanner(Device):
         eiger_single.cam.acquire.put(1)
         return status
 
-    def pre_scan_setup(self, location, n_images, acquisition_time = 10, refocus = False, recenter = False, expose_to_beam=True, transition_before=True):
-        self.configure_zebra_for_hare()
+    def pre_scan_setup(self, location, n_images, acquisition_time = 10, refocus = False, recenter = False, expose_to_beam=True, transition_before=True, zebra_readback = False):
+        self.configure_zebra_for_hare(zebra_readback = zebra_readback)
         #self.configure_detector(location, n_images, acquisition_time = acquisition_time/1000) # ms -> s
         yield from self.drive_to_location(location)
         if recenter and (transition_before or not expose_to_beam):
@@ -506,13 +492,13 @@ class ChipScanner(Device):
         shutter_bcu.close.put(1)
         if control_detector:
             def check_eiger_disarmed(*, old_value, value, **kwargs):
-                return(old_value == 1 and value == 0)
-            status = SubscriptionStatus(eiger_single.cam.acquire, check_eiger_disarmed)
+                return(old_value != 'Acquisition aborted' and value == 'Acquisition aborted')
+            status = SubscriptionStatus(eiger_single.cam.status_message, check_eiger_disarmed)
             eiger_single.cam.acquire.put(0)
         if transition_after:
             govStateSet('CA', configStr = 'Chip_Scanner')
         if control_detector:
-            status.wait(10)
+            status.wait(40)
 
     def line_scan(self, line, *args, acquisition_time = 10, location_offset_x = 0.0, location_offset_y = 0.0, refocus = False, recenter = False, expose_to_beam=True, transition_before=True, transition_after=True, control_detector = True, **kwargs):
         pattern = re.compile("^([A-H][1-8][a-t])$")
@@ -697,9 +683,22 @@ class ChipScanner(Device):
         
         self.scan_and_cleanup(xl, yl, dwell_list, dl, cl, enc_loc, expose_to_beam=expose_to_beam, transition_before=transition_before, transition_after=transition_after, detector_status=detector_status, control_detector = control_detector)
         
-    def configure_zebra_for_hare(self):
+    def configure_zebra_for_hare(self, zebra_readback):
         epics.caput("XF:17IDC-ES:FMX{Zeb:3}:OUT1_TTL", 7)
         epics.caput("XF:17IDC-ES:FMX{Zeb:3}:OUT3_TTL", 10)
+        if zebra_readback:
+            zebra.pc.arm.trig_source.put(0)
+            zebra.pc.gate.sel.put(1)
+            zebra.pc.gate.start.put(0)
+            zebra.pc.gate.width.put(100000)
+            zebra.pc.gate.step.put(101000)
+            zebra.pc.gate.num_gates.put(1)
+            zebra.pc.pulse.sel.put(2)
+            zebra.pc.pulse.start.put(0)
+            zebra.pc.pulse.width.put(9)
+            zebra.pc.pulse.step.put(10)
+            zebra.pc.pulse.delay.put(0)
+            zebra.pc.pulse.max.put(800)
 
     def check_camera_settings(self, camera):
         if camera.cam.acquire_time.get() > 0.1:
@@ -779,12 +778,12 @@ class ChipScanner(Device):
 #            return np.ceil(20/i)*np.ceil(20/j)
 
     def single_well_move_time(self):
-        fxcell = (self.F1 - self.F0)[0]/1016
-        fycell = (self.F2 - self.F0)[1]/1016
-        fcell = np.array([fxcell,fycell])
+        fxcell = (self.F1 - self.F0)/1016*5
+        #fycell = (self.F2 - self.F0)/1016
+        #fcell = np.array([fxcell,fycell])
         motor_speeds = np.array([epics.caget('XF:17IDC-ES:FMX{Chip:1-Ax:CX}Mtr.VELO'), epics.caget('XF:17IDC-ES:FMX{Chip:1-Ax:CY}Mtr.VELO')])
-        time = np.abs(fcell/motor_speeds)
-        return max(time)
+        time = np.abs(fxcell[0:2]/motor_speeds)
+        return max(time*1.022)
         
     def generate_time(self, i, j, td, tw, ta):
         if i == j == 1:
@@ -794,6 +793,8 @@ class ChipScanner(Device):
         elif i == 1:
             return j*td + (2*j - 5/2)*tw + ta
         elif j == 2:
+            return i*j*td + (i*(j+1)-5/2)*tw
+        elif i == 2:
             return i*j*td + (i*(j+1)-5/2)*tw
         elif i%2 == 0:
             return i*j*td + (i*(j+1)-5/2)*tw + ta
@@ -821,20 +822,21 @@ class ChipScanner(Device):
         well_move_time = self.single_well_move_time()*1000
         t1 = self.generate_time(xn, yn, acq_time + acceleration_time, well_move_time, acceleration_time)
         if xn == yn == 1:
+            #print(drop_to_det_time - t1)
             xr = np.array([-.5,0])
             yr = np.array([-.5,0])
             dr = np.array([1,0])
             cr = np.array([0,1])
-            dwr = np.array([drop_to_det_time - t1, acq_time])
+            dwr = np.array([drop_to_det_time - t1 + acq_time, acq_time])
         elif xn == 1 and yn == 2:
             xr = np.array([-.5,.5,0,1])
             yr = np.array([-.5,-.5,0,0])
             dr = np.array([1,1,0,0])
             cr = np.array([0,0,1,1])
-            dwr = np.array([acq_time, drop_to_det_time - t1, acq_time, acq_time])
+            dwr = np.array([acq_time, drop_to_det_time - t1 + acq_time, acq_time, acq_time])
         elif xn == 1:
             xr = np.array([i-.5 for i in range(yn)] + [.5] + [i for i in range(yn)])
-            yr = np.array([-.5]*(yn+1) + [1]*yn)
+            yr = np.array([-.5]*(yn+1) + [0]*yn)
             dr = np.array([1]*yn + [0]*(yn+1))
             cr = np.array([0]*(yn+1) + [1]*yn)
             dwr = np.array([acq_time]*yn + [drop_to_det_time-t1] + [acq_time]*yn)
@@ -843,7 +845,7 @@ class ChipScanner(Device):
             yr = np.array([-.5]*yn + [.5]*yn + [0]*yn + [1]*yn)
             dr = np.array([1]*yn*2 + [0]*yn*2)
             cr = np.array([0]*yn*2 + [1]*yn*2)
-            dwr = np.array([acq_time]*(yn*2-1) + [drop_to_det_time-t1] + [acq_time]*(yn*2))
+            dwr = np.array([acq_time]*(yn*2-1) + [drop_to_det_time-t1 + acq_time] + [acq_time]*(yn*2))
         elif xn%2 == 0:
             xs = np.array([i for i in range(yn)] + [yn - i - 1 for i in range(yn)])
             xr = np.concatenate([np.ravel([[xs-.5] for i in range(xn//2)]), np.array([-.5]), np.ravel([[xs] for i in range(xn//2)])])
@@ -858,10 +860,9 @@ class ChipScanner(Device):
             dr = np.array([1]*xn*yn + [0]*2 + [0]*xn*yn)
             cr = np.array([0]*xn*yn + [0]*2 + [1]*xn*yn)
             dwr = np.array([acq_time]*xn*yn + [0] + [drop_to_det_time-t1] + [acq_time]*xn*yn)
-        dwr = np.ceil(dwr).astype(np.int64)
         return xr, yr, dr, cr, dwr
 
-    def neighbourhood_scan_multi_line_hare(self, neighbourhood, drop_to_det_time, droplet_offset_value = 0, acquisition_time = 10, post_drop_dwell_min_time = 10, location_offset_x = 0.0, location_offset_y = 0.0, refocus = False, recenter = False, expose_to_beam=True, transition_before=True, transition_after=True, control_detector = True):
+    def neighbourhood_scan_multi_line_hare(self, neighbourhood, drop_to_det_time, droplet_offset_value = 0, acquisition_time = 10, post_drop_dwell_min_time = 10, location_offset_x = 0.0, location_offset_y = 0.0, refocus = False, recenter = False, expose_to_beam=True, transition_before=True, transition_after=True, control_detector = True, control_zebra = True):
         ''' drop_to_det_time = pump-probe-delay'''
         pattern = re.compile("^([A-H][1-8])$")
         if not pattern.match(neighbourhood):
@@ -871,44 +872,121 @@ class ChipScanner(Device):
             detector_status = self.configure_detector(neighbourhood, 400, acquisition_time = acquisition_time/1000)
         else:
             detector_status = None
-        enc_loc = yield from self.pre_scan_setup(neighbourhood+"aa", 400, acquisition_time = acquisition_time, refocus = refocus, recenter = recenter, expose_to_beam=expose_to_beam, transition_before=transition_before)
+        enc_loc = yield from self.pre_scan_setup(neighbourhood+"aa", 400, acquisition_time = acquisition_time, refocus = refocus, recenter = recenter, expose_to_beam=expose_to_beam, transition_before=transition_before, zebra_readback = control_zebra)
         acq_time = max(acquisition_time, post_drop_dwell_min_time)
-        path = yield from self.calculate_multi_line_hare(drop_to_det_time, post_drop_dwell_min_time = post_drop_dwell_min_time, droplet_offset_value = droplet_offset_value, acquisition_time = acq_time)
+        path = yield from self.calculate_multi_line_hare(drop_to_det_time, droplet_offset_value = droplet_offset_value, acquisition_time = acq_time)
+        print(path)
         xl = []
         yl = []
         dl = [] 
         cl = []
         dwell_list = []
-        xmod, xrem = divmod(20, path[0])
-        ymod, yrem = divmod(20, path[1])
+        xmod, xrem = divmod(20, path[1])
+        ymod, yrem = divmod(20, path[0])
         
-        xlengths = [path[0]]*xmod
+        xlengths = [path[1]]*xmod
         if xrem != 0:
-            xlengths.append([xrem])
+            xlengths.append(xrem)
         ylengths = [path[0]]*ymod
         if yrem != 0:
-            ylengths.append([yrem])
+            ylengths.append(yrem)
 
-        for i,j in itertools.product(xlengths, ylengths):
-            xr, yr, dr, cr, dwr = self.generate_path(i, j, drop_to_det_time, acq_time)
-            xl.extend(xr)
-            yl.extend(yr)
-            dl.extend(dr)
-            cl.extend(cr)
-            dwell_list.extend(dwr)
+        #for i,j in itertools.product(xlengths, ylengths):
+        #    xr, yr, dr, cr, dwr = self.generate_path(i, j, drop_to_det_time, acq_time)
+        yloc = 0
+        for j, numy in enumerate(ylengths):
+            xloc = 0
+            for i, numx in enumerate(xlengths):
+                xr, yr, dr, cr, dwr = self.generate_path(numy, numx, drop_to_det_time, acq_time)
+                xl.extend(xr + xloc)
+                xloc = xloc + numx
+                yl.extend(yr + yloc)
+                dl.extend(dr)
+                cl.extend(cr)
+                dwell_list.extend(dwr.astype(int))
+            yloc = yloc + numy
+            print(xloc, yloc)
+        print(xloc, yloc)
+        print(xl)
+        print(yl)
+        print(dwell_list)
 
+        if control_zebra:
+            zebra.pc.arm_signal.put(1)
+            
         self.scan_and_cleanup(xl, yl, dwell_list, dl, cl, enc_loc, expose_to_beam=expose_to_beam, transition_before=transition_before, transition_after=transition_after, detector_status=detector_status, control_detector = control_detector)
+        
+        if control_zebra:
+            try:
+                self.analyze_zebra_output(dl, cl)
+            except Exception as e:
+                print(f"Error {e} in zebra analysis, continuing.")
+            def check_zebra_disarmed(*, old_value, value, **kwargs):
+                return(value == 0)
+            status = SubscriptionStatus(zebra.download_status, check_zebra_disarmed)
+            zebra.reset.put(1)
+            status.wait(10)
 
-    def calculate_multi_line_hare(self, drop_to_det_time, post_drop_dwell_min_time = 10, droplet_offset_value = 0, acquisition_time = 10):
+    def analyze_zebra_output(self, dl, cl):
+        times = zebra.pc.data.time.get()
+        drop_times = []
+        capture_times = []
+        j = 0
+        for i in range(len(dl)):
+            if dl[i]:
+                drop_times.append(times[j])
+                j = j+1
+            if cl[i]:
+                capture_times.append(times[j])
+                j = j+1
+        drops = np.array(drop_times)
+        captures = np.array(capture_times)
+        print(captures - drops)
+            
+        
+    def calculate_multi_line_hare(self, drop_to_det_time, droplet_offset_value = 0, acquisition_time = 10):
         well_move_time = self.single_well_move_time()*1000 # Convert to ms
-        min_time = well_move_time/2 + post_drop_dwell_min_time
+        print(well_move_time)
+        min_time = well_move_time/2 + acquisition_time
         if drop_to_det_time < min_time:
             print(f'Minimum available time is {min_time} determined by the delay after the drop trigger prior to a move ({post_drop_dwell_min_time}) and the motor speed ({motor_speed} um/s).')
             raise RuntimeError(f'Minimum available time is {min_time} determined by the delay after the drop trigger prior to a move ({post_drop_dwell_min_time}) and the motor speed ({motor_speed} um/s).')
         td = acquisition_time + acceleration_time
+        print(drop_to_det_time, td, well_move_time, acceleration_time)
         path = self.determine_best_path(drop_to_det_time, td, well_move_time, acceleration_time)
-        yield from self.correct_droplet_offset(y_offset=-62.5+droplet_offset_value)
+        if path[0] == path[1] == 1:
+            yield from self.correct_droplet_offset(y_offset=-62.5+droplet_offset_value)
+        else:
+            yield from self.correct_droplet_offset(y_offset=-62.5+droplet_offset_value)
         return path
+    
+    def scan(self, neighbourhoods, filename, drop_to_det_time, droplet_offset_value = 0, acquisition_time = 10, post_drop_dwell_min_time = 10, location_offset_x = 0.0, location_offset_y = 0.0, refocus = False, recenter = False, expose_to_beam=True, is_hare = True):
+        images = 0
+        if type(neighbourhoods) == str:
+            neighbourhoods = [neighbourhoods]
+        for domain in neighbourhoods:
+            if len(domain) == 2:
+                pattern = re.compile("^([A-H][1-8])$")
+                if not pattern.match(domain):
+                    print(f"Rejected location {domain}, neighbourhoods must match [A-H][1-8].")
+                    return(False)
+                images = images + 400
+            else:
+                print(f"Rejected location {domain}, values must be strings of length two or three.")
+                return(False)
+        detector_status = self.configure_detector(filename, images, acquisition_time = acquisition_time/1000)
+        detector_status.wait(10)
+        for i, domain in enumerate(neighbourhoods):
+            if is_hare:
+                scan_type = "neighbourhood_scan_multi_line_hare"
+            else:
+                scan_type = "neighbourhood_scan"
+            scan = getattr(self, scan_type)
+            transition_before = True if i==0 else False
+            transition_after = True if i==len(neighbourhoods)-1 else False
+            yield from scan(domain, drop_to_det_time, droplet_offset_value = droplet_offset_value, acquisition_time = acquisition_time, post_drop_dwell_min_time = post_drop_dwell_min_time, location_offset_x = location_offset_x, location_offset_y = location_offset_y, expose_to_beam = expose_to_beam, recenter = recenter, refocus = refocus, transition_before=transition_before, transition_after=transition_after, control_detector = False)
+        time.sleep(4)
+        eiger_single.cam.acquire.put(0)
 
 
 class OxfordChip(ChipScanner):
@@ -1040,25 +1118,6 @@ def chip_all_blocks(wait_time = 20):
         for letter in letters:
             neighbourhoods.append(f'{letter}{i}')
     multiple_neighbourhoods(neighbourhoods, wait_time = wait_time)
-
-
-
-def configure_zebra_for_chip_scanner_with_droplets_scheme_1():
-    zebra.pc.encoder.put(0)
-    zebra.pc.arm.trig_source.put(0)
-    zebra.pc.gate.sel.put(0)
-    zebra.pc.pulse.sel.put(1)
-    zebra.pc.pulse.start.put(1)
-    zebra.pc.pulse.width.put(4)
-    zebra.pc.pulse.step.put(10)
-    zebra.pc.pulse.max.put(1)
-    epics.caput("XF:17IDC-ES:FMX{Zeb:3}:M1:MRES", 0.01)
-    time.sleep(0.5)
-    epics.caput("XF:17IDC-ES:FMX{Zeb:3}:M1:SETPOS.PROC", 1)
-    epics.caput("XF:17IDC-ES:FMX{Zeb:3}:DIV1_INP", 31)
-    epics.caput("XF:17IDC-ES:FMX{Zeb:3}:DIV1_DIV", 2)
-    epics.caput("XF:17IDC-ES:FMX{Zeb:3}:OUT1_TTL", 44)
-    epics.caput("XF:17IDC-ES:FMX{Zeb:3}:OUT3_TTL", 48)
 
 
 ## Reference positions
@@ -1231,8 +1290,9 @@ def govSwitchToRobot():
     annealer.air.put(0)
     
     while not annealer.outStatus.get():
-        print(annealer.outStatus.get())
+        print('annealer is still IN')
         time.sleep(0.1)
+    print('annealer is OUT')
     
     govStateSet('SE', configStr = 'Robot')
     
