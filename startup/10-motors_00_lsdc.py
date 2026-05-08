@@ -80,7 +80,7 @@ class GoniometerStack(Device):
 
 class BeamStop(Device):
 	fx = Cpt(EpicsMotor, '-Ax:FX}Mtr', labels=['fmx'])
-	fy = Cpt(EpicsMotor, '-Ax:FY}Mtr', labels=['fmx'])
+#	fy = Cpt(EpicsMotor, '-Ax:FY}Mtr', labels=['fmx'])
     
 class Annealer(Device):
     air = Cpt(EpicsSignal, '1}AnnealerAir-Sel')
