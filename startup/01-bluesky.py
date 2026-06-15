@@ -4,14 +4,17 @@ import nslsii
 import redis
 from redis_json_dict import RedisJSONDict
 
-uri = "info.fmx.nsls2.bnl.gov"
+#uri = "info.fmx.nsls2.bnl.gov"
 # # Provide an endstation prefix, if needed, with a trailing "-"
-new_md = RedisJSONDict(redis.Redis(uri), prefix="")
+#new_md = RedisJSONDict(redis.Redis(uri), prefix="")
 BEAMLINE_ID = 'fmx'
 ## 20250107 Test startup issues
 try:
     nslsii.configure_base(get_ipython().user_ns, BEAMLINE_ID, pbar=False,
-                          publish_documents_with_kafka=True) # Progress bar for scans
+                          publish_documents_with_kafka=True,
+                          redis_url='xf17id2-fmx-redis1.nsls2.bnl.gov',
+                          redis_port=6380,
+                          redis_ssl=True) # Progress bar for scans
     #nslsii.configure_base(get_ipython().user_ns, BEAMLINE_ID)
 except:
     logging.exception('Got exception on main handler')
@@ -23,5 +26,5 @@ except:
 bec.disable_plots()
 
 # Metadata storage
-RE.md = new_md
+#RE.md = new_md
 
