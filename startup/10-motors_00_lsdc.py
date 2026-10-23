@@ -78,6 +78,11 @@ class GoniometerStack(Device):
 	py = Cpt(EpicsMotor, '-Ax:PY}Mtr', labels=['fmx'])
 	pz = Cpt(EpicsMotor, '-Ax:PZ}Mtr', labels=['fmx'])
 
+class Goniometer2(Device):
+	x = Cpt(EpicsMotor, '-Ax:GX}Mtr', labels=['fmx'])
+	y = Cpt(EpicsMotor, '-Ax:GY}Mtr', labels=['fmx'])
+	z = Cpt(EpicsMotor, '-Ax:GZ}Mtr', labels=['fmx'])
+
 class BeamStop(Device):
 	fx = Cpt(EpicsMotor, '-Ax:FX}Mtr', labels=['fmx'])
 #	fy = Cpt(EpicsMotor, '-Ax:FY}Mtr', labels=['fmx'])
@@ -127,7 +132,7 @@ slits1 = Slits('XF:17IDA-OP:FMX{Slt:1', name='slits1', labels=['fmx'])
 slits2 = Slits('XF:17IDC-OP:FMX{Slt:2', name='slits2', labels=['fmx'])
 slits3 = Slits('XF:17IDC-OP:FMX{Slt:3', name='slits3', labels=['fmx'])
 slits4 = Slits('XF:17IDC-OP:FMX{Slt:4', name='slits4', labels=['fmx'])
-slits5 = Slits('XF:17IDC-OP:FMX{Slt:5', name='slits5', labels=['fmx'])
+#slits5 = Slits('XF:17IDC-OP:FMX{Slt:5', name='slits5', labels=['fmx'])  # TODO FIX: These are on MCS now
 
 ## BPM Motions
 mbpm1 = XYMotor('XF:17IDA-BI:FMX{BPM:1', name='mbpm1')
@@ -146,6 +151,9 @@ hm = XYZMotor('XF:17IDC-ES:FMX{Mir:1', name='hm')
 
 ## Goniometer Stack
 gonio = GoniometerStack('XF:17IDC-ES:FMX{Gon:1', name='gonio')
+
+## Goniometer Stack
+gonio2 = Goniometer2('XF:17IDC-ES:FMX{Gon:2', name='gonio2')
 
 ## PI Scanner Fine Stages
 pif = XYZfMotor('XF:17IDC-ES:FMX{Gon:1', name='pif')

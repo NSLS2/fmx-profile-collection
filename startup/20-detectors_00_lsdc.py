@@ -2,6 +2,9 @@ from ophyd import (SingleTrigger, ProsilicaDetector,
                    ImagePlugin, TIFFPlugin, StatsPlugin, ROIPlugin, DetectorBase, HDF5Plugin,
                    TransformPlugin, ProcessPlugin, AreaDetector)
 
+#from ophyd.plugins import TimeSeriesPlugin
+from ophyd.areadetector.plugins import TimeSeriesPlugin, TimeSeriesPlugin_V25
+
 from ophyd import Component as Cpt
 
 keithley = EpicsSignalRO('XF:17IDC-BI:FMX{Keith:1}readFloat', name='keithley')
@@ -18,6 +21,7 @@ class StandardProsilica(SingleTrigger, ProsilicaDetector):
     stats2 = Cpt(StatsPlugin, 'Stats2:')
     stats3 = Cpt(StatsPlugin, 'Stats3:')
     stats4 = Cpt(StatsPlugin, 'Stats4:')
+    stats4_ts = Cpt(TimeSeriesPlugin_V25, "Stats4:TS:")
     stats5 = Cpt(StatsPlugin, 'Stats5:')
     tiff = Cpt(TIFFPlugin, 'TIFF1:')
 

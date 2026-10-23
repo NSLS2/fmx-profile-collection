@@ -862,7 +862,7 @@ class ChipScanner(Device):
             dwr = np.array([acq_time]*xn*yn + [0] + [drop_to_det_time-t1] + [acq_time]*xn*yn)
         return xr, yr, dr, cr, dwr
 
-    def neighbourhood_scan_multi_line_hare(self, neighbourhood, drop_to_det_time, droplet_offset_value = 0, acquisition_time = 10, post_drop_dwell_min_time = 10, location_offset_x = 0.0, location_offset_y = 0.0, refocus = False, recenter = False, expose_to_beam=True, transition_before=True, transition_after=True, control_detector = True, control_zebra = True):
+    def neighbourhood_scan_multi_line_hare(self, neighbourhood, drop_to_det_time, droplet_offset_value = 0, acquisition_time = 10, post_drop_dwell_min_time = 10, location_offset_x = 0.0, location_offset_y = 0.0, refocus = False, recenter = False, expose_to_beam=True, transition_before=True, transition_after=True, control_detector = True, control_zebra = True, skip_every_n = 0):
         ''' drop_to_det_time = pump-probe-delay'''
         pattern = re.compile("^([A-H][1-8])$")
         if not pattern.match(neighbourhood):
@@ -905,11 +905,14 @@ class ChipScanner(Device):
                 cl.extend(cr)
                 dwell_list.extend(dwr.astype(int))
             yloc = yloc + numy
-            print(xloc, yloc)
-        print(xloc, yloc)
-        print(xl)
-        print(yl)
-        print(dwell_list)
+        #    print(xloc, yloc)
+        #print(xloc, yloc)
+        #print(xl)
+        #print(yl)
+        #print(dwell_list)
+
+        if skip_every_n:
+            dl = ((xr + yr) % skip_every_n != 0) * dl
 
         if control_zebra:
             zebra.pc.arm_signal.put(1)
@@ -960,7 +963,7 @@ class ChipScanner(Device):
             yield from self.correct_droplet_offset(y_offset=-62.5+droplet_offset_value)
         return path
     
-    def scan(self, neighbourhoods, filename, drop_to_det_time, droplet_offset_value = 0, acquisition_time = 10, post_drop_dwell_min_time = 10, location_offset_x = 0.0, location_offset_y = 0.0, refocus = False, recenter = False, expose_to_beam=True, is_hare = True):
+    def scan(self, neighbourhoods, filename, drop_to_det_time, droplet_offset_value = 0, acquisition_time = 10, post_drop_dwell_min_time = 10, location_offset_x = 0.0, location_offset_y = 0.0, refocus = False, recenter = False, expose_to_beam=True, is_hare = True, skip_every_n = 0):
         images = 0
         if type(neighbourhoods) == str:
             neighbourhoods = [neighbourhoods]
@@ -984,7 +987,7 @@ class ChipScanner(Device):
             scan = getattr(self, scan_type)
             transition_before = True if i==0 else False
             transition_after = True if i==len(neighbourhoods)-1 else False
-            yield from scan(domain, drop_to_det_time, droplet_offset_value = droplet_offset_value, acquisition_time = acquisition_time, post_drop_dwell_min_time = post_drop_dwell_min_time, location_offset_x = location_offset_x, location_offset_y = location_offset_y, expose_to_beam = expose_to_beam, recenter = recenter, refocus = refocus, transition_before=transition_before, transition_after=transition_after, control_detector = False)
+            yield from scan(domain, drop_to_det_time, droplet_offset_value = droplet_offset_value, acquisition_time = acquisition_time, post_drop_dwell_min_time = post_drop_dwell_min_time, location_offset_x = location_offset_x, location_offset_y = location_offset_y, expose_to_beam = expose_to_beam, recenter = recenter, refocus = refocus, transition_before=transition_before, transition_after=transition_after, control_detector = False, skip_every_n = 0)
         time.sleep(4)
         eiger_single.cam.acquire.put(0)
 
@@ -1297,4 +1300,9 @@ def govSwitchToRobot():
     govStateSet('SE', configStr = 'Robot')
     
     return
-    
+   
+
+def zero_motor(motor):
+    off = motor.user_offset.get()
+    val = motor.user_readback.get()
+    motor.user_offset.set(off - val) 

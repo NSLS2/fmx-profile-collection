@@ -46,7 +46,7 @@ def simple_ascan(camera, stats, motor, start, end, steps):
     if bec_exists and bec_table_enabled:
         bec.enable_table()
         
-
+        
 def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None, filepath=None, filename=None):
     """Scans a slit aperture center over a mirror against a camera
 
@@ -132,6 +132,7 @@ def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None, filep
     cam         = camera.cam if camera else m['camera'].cam
     tiff        = camera.tiff if camera else m['camera'].tiff
     stats       = camera.stats4 if camera else m['camera'].stats4
+    stats_ts    = camera.stats4_ts if camera else m['camera'].stats4_ts
     encoder_idx = m['encoder_idx']
 
     # Calculate parameters
@@ -184,8 +185,8 @@ def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None, filep
             self._collection_ts = None
 
             self._ts = zebra.pos_capt.data.time
-            self._centroid_x = stats.ts_centroid.x
-            self._centroid_y = stats.ts_centroid.y
+            self._centroid_x = stats_ts.ts_centroid.x
+            self._centroid_y = stats_ts.ts_centroid.y
             self._enc = getattr(zebra.pos_capt.data, f'enc{encoder_idx+1}')
 
             self._data_sources = (self._centroid_x, self._centroid_y, self._enc)
@@ -232,8 +233,8 @@ def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None, filep
     flyer = CustomFlyer('', name='flyer')
 
     # Setup plot
-    y1 = stats.ts_centroid.x.name
-    y2 = stats.ts_centroid.y.name
+    y1 = stats_ts.ts_centroid.x.name
+    y2 = stats_ts.ts_centroid.y.name
     x = getattr(zebra.pos_capt.data, f'enc{encoder_idx+1}').name
 
     fig, ax1 = plt.subplots()
@@ -299,7 +300,7 @@ def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None, filep
         yield from bps.mv(
             slt_gap, gap,                     # Move gap to desired position
             slt_ctr, start - move_slack,      # Move slits to the beginning of the motion
-            stats.ts_control, "Erase/Start",  # Prepare statistics Time Series
+            stats_ts.ts_control, "Erase/Start",  # Prepare statistics Time Series
         )
 
         # Set Slits Center velocity for the scan
@@ -317,7 +318,7 @@ def mirror_scan(mir, start, end, steps, gap=None, speed=None, camera=None, filep
         yield from bps.sleep(1)
         yield from bps.collect(flyer, stream=True)
 
-        yield from bps.mv(stats.ts_control, "Stop")
+        yield from bps.mv(stats_ts.ts_control, "Stop")
 
         # Stop the camera after the scan
         yield from bps.mv(cam.acquire, 0)   # Stop camera...

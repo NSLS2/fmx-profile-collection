@@ -17,6 +17,7 @@ def help_fmx():
     FMX beamline functions:
     
     anneal()        - Transitions Governor from SA to CB state and inserts annealer
+      annealer.air.put(1|0) - activate / deactivate annealer
     beam_center_align() - Align goniometer and LSDC beam center to current beam position
     dcm_rock()      - Scan DCM crystal 2 pitch to maximize flux on BPM1
     fmx_dose()      - Caluclate dose for a set of LSDC settings
